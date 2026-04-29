@@ -12,6 +12,14 @@ const routine = (() => {
   return created;
 })();
 
+const routineWithWorkoutAfterRest = (() => {
+  let created = addItem(addItem(addItem(createRoutine('B'), 'workout'), 'interval'), 'workout');
+  created = updateItem(created, created.items[0].id, { title: 'ベンチプレス', durationSec: 20 });
+  created = updateItem(created, created.items[1].id, { title: '休憩', durationSec: 60 });
+  created = updateItem(created, created.items[2].id, { title: 'スクワット', durationSec: 30 });
+  return created;
+})();
+
 const idle: TimerState = { routineId: '', currentIndex: 0, remainingSec: 0, status: 'idle' };
 
 describe('timerService voice announcements', () => {
@@ -62,6 +70,18 @@ describe('timerService voice announcements', () => {
     );
 
     expect(voice.spoken).toEqual(['休憩、60秒']);
+  });
+
+  it('休憩カードが始まった時は休憩秒数の後に次の種目名と秒数を読み上げる', () => {
+    const voice = new MockVoiceService();
+    announceForTransition(
+      { routineId: routineWithWorkoutAfterRest.id, currentIndex: 0, remainingSec: 1, status: 'running' },
+      { routineId: routineWithWorkoutAfterRest.id, currentIndex: 1, remainingSec: 60, status: 'running' },
+      routineWithWorkoutAfterRest,
+      voice,
+    );
+
+    expect(voice.spoken).toEqual(['休憩、60秒。次、スクワット、30秒']);
   });
 
   it('前のカードが残り10秒になった時に次のカード名と秒数を自動で読み上げる', () => {

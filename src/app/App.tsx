@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { RoutineEditPage } from '../pages/RoutineEditPage';
 import { RoutineListPage } from '../pages/RoutineListPage';
 import { TimerPage } from '../pages/TimerPage';
+import { createDefaultRoutine } from '../features/routines/defaultRoutine';
 import { createRoutine } from '../features/routines/routineFactory';
 import { duplicateRoutine } from '../features/routines/routineOperations';
 import { LocalStorageRoutineRepository } from '../features/routines/localStorageRoutineRepository';
@@ -13,6 +14,9 @@ type View =
   | { name: 'list' }
   | { name: 'edit'; routineId: string }
   | { name: 'timer'; routineId: string };
+
+const DEFAULT_ROUTINE_SEEDED_KEY = 'workout_timer_default_routine_seeded_v2';
+const DEFAULT_ROUTINE_NAME = '全身トレーニング';
 
 export function App() {
   const repository = useMemo(() => new LocalStorageRoutineRepository(), []);
@@ -26,7 +30,18 @@ export function App() {
   }, []);
 
   async function reload() {
-    setRoutines(await repository.findAll());
+    const savedRoutines = await repository.findAll();
+    const hasDefaultRoutine = savedRoutines.some(
+      (routine) => routine.name === DEFAULT_ROUTINE_NAME
+    );
+    if (!hasDefaultRoutine && localStorage.getItem(DEFAULT_ROUTINE_SEEDED_KEY) !== 'true') {
+      const defaultRoutine = createDefaultRoutine();
+      await repository.save(defaultRoutine);
+      localStorage.setItem(DEFAULT_ROUTINE_SEEDED_KEY, 'true');
+      setRoutines([...savedRoutines, defaultRoutine]);
+      return;
+    }
+    setRoutines(savedRoutines);
   }
 
   async function createNewRoutine() {
@@ -55,10 +70,17 @@ export function App() {
     await reload();
   }
 
-  const selectedRoutine = 'routineId' in view ? routines.find((routine) => routine.id === view.routineId) : undefined;
+  const selectedRoutine =
+    'routineId' in view ? routines.find((routine) => routine.id === view.routineId) : undefined;
 
   if (view.name === 'edit' && selectedRoutine) {
-    return <RoutineEditPage routine={selectedRoutine} onSave={saveRoutine} onBack={() => setView({ name: 'list' })} />;
+    return (
+      <RoutineEditPage
+        routine={selectedRoutine}
+        onSave={saveRoutine}
+        onBack={() => setView({ name: 'list' })}
+      />
+    );
   }
 
   if (view.name === 'timer' && selectedRoutine) {
