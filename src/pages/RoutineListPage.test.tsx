@@ -21,7 +21,7 @@ describe('RoutineListPage', () => {
     );
 
     expect(screen.getByText('全身トレA')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '新規作成' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '＋ 新規' })).toBeInTheDocument();
   });
 
   it('空状態で最初のルーティンを作成できる', async () => {

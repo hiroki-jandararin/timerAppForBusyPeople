@@ -22,7 +22,7 @@ describe('RoutineEditPage', () => {
     render(<RoutineEditPage routine={createRoutine('A')} onSave={onSave} onBack={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: 'ワークアウト追加' }));
-    await user.click(screen.getByRole('button', { name: '保存' }));
+    await user.click(screen.getAllByRole('button', { name: '保存' })[0]);
 
     expect(onSave).toHaveBeenCalledOnce();
     expect(onSave.mock.calls[0][0].items).toHaveLength(1);

@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { RoutineItemCard } from '../components/RoutineItemCard';
-import { addItem, deleteItem, duplicateItem, moveItemDown, moveItemUp, renameRoutine, updateItem, validateRoutine } from '../features/routines/routineOperations';
+import {
+  addItem,
+  deleteItem,
+  duplicateItem,
+  moveItemDown,
+  moveItemUp,
+  renameRoutine,
+  updateItem,
+  validateRoutine,
+} from '../features/routines/routineOperations';
 import type { Routine, RoutineItem } from '../features/routines/routineTypes';
 
 type Props = {
@@ -12,10 +21,18 @@ type Props = {
 export function RoutineEditPage({ routine, onSave, onBack }: Props) {
   const [draft, setDraft] = useState(routine);
   const [errors, setErrors] = useState<string[]>([]);
-  const buttonBase = 'min-h-11 rounded-lg border px-3 text-sm font-bold shadow-sm transition active:translate-y-px';
+  const buttonBase =
+    'min-h-11 rounded-lg border px-3 text-sm font-bold shadow-sm transition active:translate-y-px';
   const buttonClass = `${buttonBase} border-[#efc4a2] bg-[#fffdfa] text-[#241710]`;
-  const primaryButtonClass = `${buttonBase} border-[#e45112] bg-[#e95f1a] text-white shadow-[#f26a21]/25`;
-  const inputClass = 'min-h-10 w-full rounded-lg border border-[#efc4a2] bg-[#fffdfa] px-3 text-sm text-[#241710] shadow-inner shadow-[#f2d5bd]/40 focus:border-[#f26a21] focus:outline-none focus:ring-2 focus:ring-[#f26a21]/20';
+  const addWorkoutButtonClass =
+    'min-h-10 rounded-lg border border-[#f5a568] bg-[#fefefe] px-3 text-sm font-bold text-[#b84b12] shadow-sm shadow-[#f26a21]/10 transition active:translate-y-px';
+  const addIntervalButtonClass =
+    'min-h-10 rounded-lg border border-[#cfd9e0] bg-[#f1f5f8] px-3 text-sm font-bold text-[#577082] shadow-sm shadow-[#7f97a8]/10 transition active:translate-y-px';
+  const saveButtonClass =
+    'min-h-10 rounded-lg border border-[#e45112] bg-[#e95f1a] px-3 text-sm font-bold text-white shadow-sm shadow-[#f26a21]/20 transition active:translate-y-px';
+  const inputClass =
+    'min-h-10 w-full rounded-lg border border-[#efc4a2] bg-[#fffdfa] px-3 text-sm text-[#241710] shadow-inner shadow-[#f2d5bd]/40 focus:border-[#f26a21] focus:outline-none focus:ring-2 focus:ring-[#f26a21]/20';
+  const backLinkClass = 'border-0 bg-transparent p-0 text-sm font-bold text-[#8a4b23] shadow-none';
 
   function save() {
     const validationErrors = validateRoutine(draft);
@@ -29,18 +46,36 @@ export function RoutineEditPage({ routine, onSave, onBack }: Props) {
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[720px] p-4 text-[#241710] sm:p-5">
-      <header className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-[#f5c198] bg-[#ffead8] p-3 shadow-sm shadow-[#d96a1f]/10 sm:items-center">
-        <button className={buttonClass} onClick={onBack}>戻る</button>
-        <button className={primaryButtonClass} onClick={save}>保存</button>
+      <header className="flex items-start justify-between gap-3">
+        <button className={backLinkClass} onClick={onBack}>
+          ← 戻る
+        </button>
+        <button className={saveButtonClass} onClick={save}>
+          保存
+        </button>
       </header>
       <section className="grid gap-3">
-        <label className="grid gap-1.5 text-sm font-bold">
+        <label className="grid gap-2 text-sm font-medium text-[#000000]">
           ルーティン名
-          <input className={inputClass} value={draft.name} onChange={(event) => setDraft(renameRoutine(draft, event.target.value))} />
+          <input
+            className={inputClass}
+            value={draft.name}
+            onChange={(event) => setDraft(renameRoutine(draft, event.target.value))}
+          />
         </label>
         <div className="grid grid-cols-2 gap-2">
-          <button className={primaryButtonClass} onClick={() => setDraft(addItem(draft, 'workout'))}>ワークアウト追加</button>
-          <button className={buttonClass} onClick={() => setDraft(addItem(draft, 'interval'))}>インターバル追加</button>
+          <button
+            className={addWorkoutButtonClass}
+            onClick={() => setDraft(addItem(draft, 'workout'))}
+          >
+            ワークアウト追加
+          </button>
+          <button
+            className={addIntervalButtonClass}
+            onClick={() => setDraft(addItem(draft, 'interval'))}
+          >
+            インターバル追加
+          </button>
         </div>
         {errors.length > 0 && (
           <ul className="m-0 rounded-lg bg-[#fff0ee] py-3 pr-4 pl-8 font-bold text-[#9c211b]">
@@ -49,7 +84,7 @@ export function RoutineEditPage({ routine, onSave, onBack }: Props) {
             ))}
           </ul>
         )}
-        <div className="grid gap-2.5">
+        <div className="grid gap-2">
           {draft.items.map((item, index) => (
             <RoutineItemCard
               key={item.id}
@@ -63,6 +98,12 @@ export function RoutineEditPage({ routine, onSave, onBack }: Props) {
             />
           ))}
         </div>
+        <button
+          className="min-h-[60px] rounded-lg border border-[#e45112] bg-[#e95f1a] px-4 text-lg font-bold text-white shadow-sm shadow-[#f26a21]/20 transition active:translate-y-px"
+          onClick={save}
+        >
+          保存
+        </button>
       </section>
     </main>
   );

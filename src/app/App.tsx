@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RoutineEditPage } from '../pages/RoutineEditPage';
 import { RoutineListPage } from '../pages/RoutineListPage';
 import { TimerPage } from '../pages/TimerPage';
@@ -24,6 +24,7 @@ export function App() {
   const wakeLockService = useMemo(() => new BrowserWakeLockService(), []);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [view, setView] = useState<View>({ name: 'list' });
+  const isSeedingDefaultRoutine = useRef(false);
 
   useEffect(() => {
     void reload();
@@ -31,17 +32,37 @@ export function App() {
 
   async function reload() {
     const savedRoutines = await repository.findAll();
-    const hasDefaultRoutine = savedRoutines.some(
+    const normalizedRoutines = await removeDuplicatedDefaultRoutines(savedRoutines);
+    const hasDefaultRoutine = normalizedRoutines.some(
       (routine) => routine.name === DEFAULT_ROUTINE_NAME
     );
-    if (!hasDefaultRoutine && localStorage.getItem(DEFAULT_ROUTINE_SEEDED_KEY) !== 'true') {
+    if (
+      !hasDefaultRoutine &&
+      localStorage.getItem(DEFAULT_ROUTINE_SEEDED_KEY) !== 'true' &&
+      !isSeedingDefaultRoutine.current
+    ) {
+      isSeedingDefaultRoutine.current = true;
       const defaultRoutine = createDefaultRoutine();
       await repository.save(defaultRoutine);
       localStorage.setItem(DEFAULT_ROUTINE_SEEDED_KEY, 'true');
-      setRoutines([...savedRoutines, defaultRoutine]);
+      setRoutines([...normalizedRoutines, defaultRoutine]);
+      isSeedingDefaultRoutine.current = false;
       return;
     }
-    setRoutines(savedRoutines);
+    setRoutines(normalizedRoutines);
+  }
+
+  async function removeDuplicatedDefaultRoutines(savedRoutines: Routine[]) {
+    const defaultRoutines = savedRoutines.filter(
+      (routine) => routine.name === DEFAULT_ROUTINE_NAME
+    );
+    if (defaultRoutines.length <= 1) return savedRoutines;
+
+    const [, ...duplicatedDefaults] = defaultRoutines;
+    await Promise.all(duplicatedDefaults.map((routine) => repository.delete(routine.id)));
+    return savedRoutines.filter(
+      (routine) => !duplicatedDefaults.some((duplicated) => duplicated.id === routine.id)
+    );
   }
 
   async function createNewRoutine() {

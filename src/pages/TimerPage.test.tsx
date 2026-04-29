@@ -19,6 +19,13 @@ function createTimerRoutine() {
 }
 
 describe('TimerPage', () => {
+  it('開始前は最初のカードの秒数を表示する', () => {
+    render(<TimerPage routine={createTimerRoutine()} voiceService={new MockVoiceService()} wakeLockService={wakeLockService} onBack={vi.fn()} />);
+
+    expect(screen.getByRole('heading', { name: 'スクワット' })).toBeInTheDocument();
+    expect(screen.getByLabelText('残り秒数')).toHaveTextContent('30');
+  });
+
   it('タイマー画面で現在の種目名と残り秒数が表示される', async () => {
     const user = userEvent.setup();
 
