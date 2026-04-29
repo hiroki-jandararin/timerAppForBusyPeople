@@ -1,29 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { RoutineEditPage } from '../pages/RoutineEditPage';
-import { RoutineListPage } from '../pages/RoutineListPage';
-import { TimerPage } from '../pages/TimerPage';
+import type { Routine } from '../features/routines/routineTypes';
 import { createDefaultRoutine } from '../features/routines/defaultRoutine';
-import { createRoutine } from '../features/routines/routineFactory';
 import { duplicateRoutine } from '../features/routines/routineOperations';
 import { LocalStorageRoutineRepository } from '../features/routines/localStorageRoutineRepository';
-import type { Routine } from '../features/routines/routineTypes';
 import { BrowserVoiceService } from '../features/voice/browserVoiceService';
 import { BrowserWakeLockService } from '../features/wakeLock/browserWakeLockService';
-
-type View =
-  | { name: 'list' }
-  | { name: 'edit'; routineId: string }
-  | { name: 'timer'; routineId: string };
+import type { VoiceService } from '../features/voice/voiceService';
+import type { WakeLockService } from '../features/wakeLock/wakeLockService';
+import { AppRoutes } from './routes';
 
 const DEFAULT_ROUTINE_SEEDED_KEY = 'workout_timer_default_routine_seeded_v2';
 const DEFAULT_ROUTINE_NAME = '全身トレーニング';
 
 export function App() {
   const repository = useMemo(() => new LocalStorageRoutineRepository(), []);
-  const voiceService = useMemo(() => new BrowserVoiceService(), []);
-  const wakeLockService = useMemo(() => new BrowserWakeLockService(), []);
+  const voiceService = useMemo<VoiceService>(() => new BrowserVoiceService(), []);
+  const wakeLockService = useMemo<WakeLockService>(() => new BrowserWakeLockService(), []);
   const [routines, setRoutines] = useState<Routine[]>([]);
-  const [view, setView] = useState<View>({ name: 'list' });
+  const [isLoaded, setIsLoaded] = useState(false);
   const isSeedingDefaultRoutine = useRef(false);
 
   useEffect(() => {
@@ -34,7 +28,7 @@ export function App() {
     const savedRoutines = await repository.findAll();
     const normalizedRoutines = await removeDuplicatedDefaultRoutines(savedRoutines);
     const hasDefaultRoutine = normalizedRoutines.some(
-      (routine) => routine.name === DEFAULT_ROUTINE_NAME
+      (routine) => routine.name === DEFAULT_ROUTINE_NAME,
     );
     if (
       !hasDefaultRoutine &&
@@ -46,36 +40,30 @@ export function App() {
       await repository.save(defaultRoutine);
       localStorage.setItem(DEFAULT_ROUTINE_SEEDED_KEY, 'true');
       setRoutines([...normalizedRoutines, defaultRoutine]);
+      setIsLoaded(true);
       isSeedingDefaultRoutine.current = false;
       return;
     }
     setRoutines(normalizedRoutines);
+    setIsLoaded(true);
   }
 
   async function removeDuplicatedDefaultRoutines(savedRoutines: Routine[]) {
     const defaultRoutines = savedRoutines.filter(
-      (routine) => routine.name === DEFAULT_ROUTINE_NAME
+      (routine) => routine.name === DEFAULT_ROUTINE_NAME,
     );
     if (defaultRoutines.length <= 1) return savedRoutines;
 
     const [, ...duplicatedDefaults] = defaultRoutines;
     await Promise.all(duplicatedDefaults.map((routine) => repository.delete(routine.id)));
     return savedRoutines.filter(
-      (routine) => !duplicatedDefaults.some((duplicated) => duplicated.id === routine.id)
+      (routine) => !duplicatedDefaults.some((duplicated) => duplicated.id === routine.id),
     );
-  }
-
-  async function createNewRoutine() {
-    const routine = createRoutine();
-    await repository.save(routine);
-    await reload();
-    setView({ name: 'edit', routineId: routine.id });
   }
 
   async function saveRoutine(routine: Routine) {
     await repository.save(routine);
     await reload();
-    setView({ name: 'list' });
   }
 
   async function removeRoutine(id: string) {
@@ -91,38 +79,15 @@ export function App() {
     await reload();
   }
 
-  const selectedRoutine =
-    'routineId' in view ? routines.find((routine) => routine.id === view.routineId) : undefined;
-
-  if (view.name === 'edit' && selectedRoutine) {
-    return (
-      <RoutineEditPage
-        routine={selectedRoutine}
-        onSave={saveRoutine}
-        onBack={() => setView({ name: 'list' })}
-      />
-    );
-  }
-
-  if (view.name === 'timer' && selectedRoutine) {
-    return (
-      <TimerPage
-        routine={selectedRoutine}
-        voiceService={voiceService}
-        wakeLockService={wakeLockService}
-        onBack={() => setView({ name: 'list' })}
-      />
-    );
-  }
-
   return (
-    <RoutineListPage
+    <AppRoutes
+      isLoaded={isLoaded}
       routines={routines}
-      onCreate={createNewRoutine}
-      onEdit={(id) => setView({ name: 'edit', routineId: id })}
-      onStart={(id) => setView({ name: 'timer', routineId: id })}
-      onDuplicate={copyRoutine}
+      onSave={saveRoutine}
       onDelete={removeRoutine}
+      onDuplicate={copyRoutine}
+      voiceService={voiceService}
+      wakeLockService={wakeLockService}
     />
   );
 }

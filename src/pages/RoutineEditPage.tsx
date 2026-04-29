@@ -14,11 +14,12 @@ import type { Routine, RoutineItem } from '../features/routines/routineTypes';
 
 type Props = {
   routine: Routine;
-  onSave: (routine: Routine) => void;
+  existingRoutines: Routine[];
+  onSave: (routine: Routine) => void | Promise<void>;
   onBack: () => void;
 };
 
-export function RoutineEditPage({ routine, onSave, onBack }: Props) {
+export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: Props) {
   const [draft, setDraft] = useState(routine);
   const [errors, setErrors] = useState<string[]>([]);
   const buttonBase =
@@ -35,7 +36,7 @@ export function RoutineEditPage({ routine, onSave, onBack }: Props) {
   const backLinkClass = 'border-0 bg-transparent p-0 text-sm font-bold text-[#8a4b23] shadow-none';
 
   function save() {
-    const validationErrors = validateRoutine(draft);
+    const validationErrors = validateRoutine(draft, existingRoutines);
     setErrors(validationErrors);
     if (validationErrors.length === 0) onSave(draft);
   }
@@ -61,6 +62,7 @@ export function RoutineEditPage({ routine, onSave, onBack }: Props) {
             className={inputClass}
             value={draft.name}
             onChange={(event) => setDraft(renameRoutine(draft, event.target.value))}
+            placeholder="ルーティン名を入力"
           />
         </label>
         <div className="grid grid-cols-2 gap-2">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addItem, deleteItem, duplicateItem, duplicateRoutine, moveItemDown, moveItemUp, renameRoutine, updateItem } from './routineOperations';
+import { addItem, deleteItem, duplicateItem, duplicateRoutine, moveItemDown, moveItemUp, renameRoutine, updateItem, validateRoutine } from './routineOperations';
 import { createRoutine } from './routineFactory';
 
 describe('routine operations', () => {
@@ -81,5 +81,12 @@ describe('routine operations', () => {
     const updated = updateItem(routine, routine.items[0].id, { durationSec: 45 });
 
     expect(updated.items[0].durationSec).toBe(45);
+  });
+
+  it('同じ名前のルーティンは検出できる', () => {
+    const routine = createRoutine('A');
+    const errors = validateRoutine(routine, [createRoutine('A')]);
+
+    expect(errors).toContain('同じ名前のルーティンは追加できません');
   });
 });

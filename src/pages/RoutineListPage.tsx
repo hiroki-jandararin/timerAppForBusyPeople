@@ -3,11 +3,11 @@ import type { Routine } from '../features/routines/routineTypes';
 
 type Props = {
   routines: Routine[];
-  onCreate: () => void;
+  onCreate: () => void | Promise<void>;
   onEdit: (id: string) => void;
   onStart: (id: string) => void;
-  onDuplicate: (routine: Routine) => void;
-  onDelete: (id: string) => void;
+  onDuplicate: (routine: Routine) => void | Promise<void>;
+  onDelete: (id: string) => void | Promise<void>;
 };
 
 export function RoutineListPage({
@@ -33,7 +33,7 @@ export function RoutineListPage({
               QuickFit Timer
             </h1>
             <p className="m-0 mt-1 text-sm font-medium leading-snug text-[#a65a2a]">
-              忙しい人の筋トレタイマー
+              忙しい人のための筋トレタイマー
             </p>
           </div>
           <button className={`${createButtonClass} mt-8`} onClick={onCreate}>

@@ -64,7 +64,7 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
           合計 {formatDuration(calculateTotalDuration(routine))}
         </div>
       </header>
-      <p className="mb-3　mt-3 rounded-lg border border-[#f5c198] bg-[#fff7ef] px-3 py-2 text-sm font-medium text-[#8a4b23]">
+      <p className="mb-3 mt-3 rounded-lg border border-[#f5c198] bg-[#fff7ef] px-3 py-2 text-sm font-medium text-[#8a4b23]">
         画面を開いたまま使用してください
       </p>
       <TimerDisplay routine={routine} state={state} />

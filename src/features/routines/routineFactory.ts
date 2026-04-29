@@ -2,7 +2,7 @@ import type { Routine, RoutineItem, RoutineItemType } from './routineTypes';
 
 const createId = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
 
-export function createRoutine(name = '新しいルーティン', now = new Date()): Routine {
+export function createRoutine(name = '', now = new Date()): Routine {
   const timestamp = now.toISOString();
   return {
     id: createId('routine'),

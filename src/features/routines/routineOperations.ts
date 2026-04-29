@@ -84,9 +84,16 @@ export function calculateTotalDuration(routine: Pick<Routine, 'items'>): number 
   return routine.items.reduce((total, item) => total + item.durationSec, 0);
 }
 
-export function validateRoutine(routine: Routine): string[] {
+export function validateRoutine(routine: Routine, existingRoutines: Routine[] = []): string[] {
   const errors: string[] = [];
-  if (!routine.name.trim()) errors.push('ルーティン名を入力してください');
+  const normalizedName = routine.name.trim();
+  if (!normalizedName) errors.push('ルーティン名を入力してください');
+  if (
+    normalizedName &&
+    existingRoutines.some((item) => item.id !== routine.id && item.name.trim() === normalizedName)
+  ) {
+    errors.push('同じ名前のルーティンは追加できません');
+  }
   if (routine.items.length < 1) errors.push('カードを1つ以上追加してください');
   routine.items.forEach((item, index) => {
     if (item.type !== 'workout' && item.type !== 'interval') errors.push(`${index + 1}番目のカード種別が不正です`);
