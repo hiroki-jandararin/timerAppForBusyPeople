@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addItem, deleteItem, duplicateItem, duplicateRoutine, moveItemDown, moveItemUp, renameRoutine, updateItem, validateRoutine } from './routineOperations';
+import { addItem, addWorkoutSet, deleteItem, duplicateItem, duplicateRoutine, moveItemDown, moveItemUp, renameRoutine, updateItem, validateRoutine } from './routineOperations';
 import { createRoutine } from './routineFactory';
 
 describe('routine operations', () => {
@@ -31,6 +31,44 @@ describe('routine operations', () => {
     const routine = addItem(addItem(createRoutine(), 'workout'), 'interval');
 
     expect(routine.items.map((item) => item.type)).toEqual(['workout', 'interval']);
+  });
+
+  it('セットを一括追加できる', () => {
+    const routine = addWorkoutSet(createRoutine(), {
+      title: 'スクワット',
+      workoutDurationSec: 60,
+      intervalDurationSec: 90,
+      setCount: 3,
+      includeLastInterval: false,
+    });
+
+    expect(routine.items.map((item) => item.type)).toEqual([
+      'workout',
+      'interval',
+      'workout',
+      'interval',
+      'workout',
+    ]);
+    expect(routine.items.map((item) => item.title)).toEqual([
+      'スクワット 1',
+      '休憩',
+      'スクワット 2',
+      '休憩',
+      'スクワット 3',
+    ]);
+    expect(routine.items.map((item) => item.durationSec)).toEqual([60, 90, 60, 90, 60]);
+  });
+
+  it('最後の休憩を含めてセットを一括追加できる', () => {
+    const routine = addWorkoutSet(createRoutine(), {
+      title: '腕立て伏せ',
+      workoutDurationSec: 30,
+      intervalDurationSec: 60,
+      setCount: 2,
+      includeLastInterval: true,
+    });
+
+    expect(routine.items.map((item) => item.type)).toEqual(['workout', 'interval', 'workout', 'interval']);
   });
 
   it('カードを削除できる', () => {

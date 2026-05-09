@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { RoutineItemCard } from '../components/RoutineItemCard';
 import {
   addItem,
+  addWorkoutSet,
   deleteItem,
   duplicateItem,
   moveItemDown,
@@ -22,6 +23,12 @@ type Props = {
 export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: Props) {
   const [draft, setDraft] = useState(routine);
   const [errors, setErrors] = useState<string[]>([]);
+  const [isSetFormOpen, setIsSetFormOpen] = useState(false);
+  const [setTitle, setSetTitle] = useState('ワークアウト');
+  const [setWorkoutDurationSec, setSetWorkoutDurationSec] = useState('60');
+  const [setIntervalDurationSec, setSetIntervalDurationSec] = useState('90');
+  const [setCount, setSetCount] = useState('3');
+  const [includeLastInterval, setIncludeLastInterval] = useState(false);
   const buttonBase =
     'min-h-11 rounded-lg border px-3 text-sm font-bold shadow-sm transition active:translate-y-px';
   const buttonClass = `${buttonBase} border-[#efc4a2] bg-[#fffdfa] text-[#241710]`;
@@ -43,6 +50,18 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
 
   function updateCard(itemId: string, patch: Partial<Omit<RoutineItem, 'id' | 'type'>>) {
     setDraft((current) => updateItem(current, itemId, patch));
+  }
+
+  function addSet() {
+    setDraft((current) =>
+      addWorkoutSet(current, {
+        title: setTitle,
+        workoutDurationSec: Number(setWorkoutDurationSec),
+        intervalDurationSec: Number(setIntervalDurationSec),
+        setCount: Number(setCount),
+        includeLastInterval,
+      }),
+    );
   }
 
   return (
@@ -79,6 +98,78 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
             インターバル追加
           </button>
         </div>
+        <section className="grid gap-3 rounded-lg border border-[#efc4a2] bg-[#fffdfa] p-3 shadow-sm shadow-[#d96a1f]/10">
+          <button
+            type="button"
+            className="grid min-h-10 grid-cols-[1fr_auto] items-center gap-2 text-left font-bold text-[#241710]"
+            onClick={() => setIsSetFormOpen((current) => !current)}
+            aria-expanded={isSetFormOpen}
+          >
+            <span>セット一括追加</span>
+            <span className="text-[#8a4b23]">{isSetFormOpen ? '閉じる' : '開く'}</span>
+          </button>
+          {isSetFormOpen && (
+            <div className="grid gap-3 border-t border-[#f1e1d4] pt-3">
+              <label className="grid gap-2 text-sm font-medium text-[#6d5a4d]">
+                種目名
+                <input
+                  className={inputClass}
+                  value={setTitle}
+                  onChange={(event) => setSetTitle(event.target.value)}
+                  placeholder="スクワット"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="grid gap-2 text-sm font-medium text-[#6d5a4d]">
+                  ワークアウト秒数
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    value={setWorkoutDurationSec}
+                    onChange={(event) => setSetWorkoutDurationSec(event.target.value)}
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-[#6d5a4d]">
+                  休憩秒数
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    value={setIntervalDurationSec}
+                    onChange={(event) => setSetIntervalDurationSec(event.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="grid grid-cols-[1fr_auto] items-end gap-3">
+                <label className="grid gap-2 text-sm font-medium text-[#6d5a4d]">
+                  セット数
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    value={setCount}
+                    onChange={(event) => setSetCount(event.target.value)}
+                  />
+                </label>
+                <label className="flex min-h-10 items-center gap-2 text-sm font-bold text-[#6d5a4d]">
+                  <input
+                    type="checkbox"
+                    checked={includeLastInterval}
+                    onChange={(event) => setIncludeLastInterval(event.target.checked)}
+                  />
+                  最後も休憩
+                </label>
+              </div>
+              <button type="button" className={saveButtonClass} onClick={addSet}>
+                セットを追加
+              </button>
+            </div>
+          )}
+        </section>
         {errors.length > 0 && (
           <ul className="m-0 rounded-lg bg-[#fff0ee] py-3 pr-4 pl-8 font-bold text-[#9c211b]">
             {errors.map((error) => (

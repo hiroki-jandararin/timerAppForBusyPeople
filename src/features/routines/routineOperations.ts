@@ -31,6 +31,44 @@ export function addItem(routine: Routine, type: RoutineItemType): Routine {
   };
 }
 
+type AddWorkoutSetInput = {
+  title: string;
+  workoutDurationSec: number;
+  intervalDurationSec: number;
+  setCount: number;
+  includeLastInterval: boolean;
+};
+
+export function addWorkoutSet(routine: Routine, input: AddWorkoutSetInput): Routine {
+  const setCount = normalizeCount(input.setCount);
+  const workoutDurationSec = normalizeDuration(input.workoutDurationSec);
+  const intervalDurationSec = normalizeDuration(input.intervalDurationSec);
+  const title = input.title.trim() || 'ワークアウト';
+  const items: RoutineItem[] = [];
+
+  for (let index = 0; index < setCount; index += 1) {
+    items.push({
+      ...createRoutineItem('workout'),
+      title: setCount === 1 ? title : `${title} ${index + 1}`,
+      durationSec: workoutDurationSec,
+    });
+
+    if (input.includeLastInterval || index < setCount - 1) {
+      items.push({
+        ...createRoutineItem('interval'),
+        title: '休憩',
+        durationSec: intervalDurationSec,
+      });
+    }
+  }
+
+  return {
+    ...routine,
+    items: [...routine.items, ...items],
+    updatedAt: nowIso(),
+  };
+}
+
 export function updateItem(routine: Routine, itemId: string, patch: Partial<Omit<RoutineItem, 'id' | 'type'>>): Routine {
   return {
     ...routine,
@@ -107,6 +145,10 @@ export function validateRoutine(routine: Routine, existingRoutines: Routine[] = 
 
 function normalizeDuration(durationSec: number): number {
   return Math.max(1, Math.floor(durationSec));
+}
+
+function normalizeCount(count: number): number {
+  return Math.max(1, Math.floor(count));
 }
 
 function moveItem(routine: Routine, from: number, to: number): Routine {
