@@ -1,8 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { App } from './App';
+import { AuthenticatedApp } from './App';
 import { STORAGE_KEY } from '../features/routines/localStorageRoutineRepository';
+import type { AuthService, AuthUser } from '../features/auth/authTypes';
 
 describe('App', () => {
   beforeEach(() => {
@@ -20,7 +21,7 @@ describe('App', () => {
   it('新しいルーティンは保存を押すまでリストに出ない', async () => {
     const user = userEvent.setup();
 
-    render(<App />);
+    render(<AuthenticatedApp authService={createSignedInAuthService()} />);
 
     await screen.findByText('全身トレーニング');
 
@@ -35,6 +36,13 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText('全身トレーニング')).toBeInTheDocument());
     expect(readRoutinesFromStorage()).toHaveLength(1);
   });
+
+  it('未ログイン時はログイン画面を表示する', async () => {
+    render(<AuthenticatedApp authService={createAuthService(null)} />);
+
+    expect(await screen.findByRole('button', { name: 'ログイン' })).toBeInTheDocument();
+    expect(screen.queryByText('全身トレーニング')).not.toBeInTheDocument();
+  });
 });
 
 function readRoutinesFromStorage(): unknown[] {
@@ -46,6 +54,20 @@ function readRoutinesFromStorage(): unknown[] {
   } catch {
     return [];
   }
+}
+
+function createSignedInAuthService(): AuthService {
+  return createAuthService({ id: 'user-1', email: 'test@example.com' });
+}
+
+function createAuthService(user: AuthUser | null): AuthService {
+  return {
+    getCurrentUser: async () => user,
+    onAuthStateChange: () => () => undefined,
+    signIn: async () => undefined,
+    signUp: async () => undefined,
+    signOut: async () => undefined,
+  };
 }
 
 function createStorageMock() {

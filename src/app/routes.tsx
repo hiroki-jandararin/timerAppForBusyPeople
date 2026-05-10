@@ -13,6 +13,8 @@ type AppRoutesProps = {
   onSave: (routine: Routine) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onDuplicate: (routine: Routine) => Promise<void>;
+  currentUserEmail: string | null;
+  onSignOut: () => Promise<void>;
   voiceService: VoiceService;
   wakeLockService: WakeLockService;
 };
@@ -23,6 +25,8 @@ export function AppRoutes({
   onSave,
   onDelete,
   onDuplicate,
+  currentUserEmail,
+  onSignOut,
   voiceService,
   wakeLockService,
 }: AppRoutesProps) {
@@ -37,6 +41,8 @@ export function AppRoutes({
               routines={routines}
               onDelete={onDelete}
               onDuplicate={onDuplicate}
+              currentUserEmail={currentUserEmail}
+              onSignOut={onSignOut}
             />
           }
         />
@@ -70,9 +76,18 @@ type ListRouteProps = {
   routines: Routine[];
   onDelete: (id: string) => Promise<void>;
   onDuplicate: (routine: Routine) => Promise<void>;
+  currentUserEmail: string | null;
+  onSignOut: () => Promise<void>;
 };
 
-function ListRoute({ isLoaded, routines, onDelete, onDuplicate }: ListRouteProps) {
+function ListRoute({
+  isLoaded,
+  routines,
+  onDelete,
+  onDuplicate,
+  currentUserEmail,
+  onSignOut,
+}: ListRouteProps) {
   const navigate = useNavigate();
 
   if (!isLoaded) {
@@ -87,6 +102,8 @@ function ListRoute({ isLoaded, routines, onDelete, onDuplicate }: ListRouteProps
       onStart={(id) => navigate(`/routines/${id}/timer`)}
       onDuplicate={onDuplicate}
       onDelete={onDelete}
+      currentUserEmail={currentUserEmail}
+      onSignOut={onSignOut}
     />
   );
 }

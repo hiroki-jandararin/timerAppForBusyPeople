@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AuthProvider, useAuth } from '../features/auth/AuthProvider';
+import { SupabaseAuthService } from '../features/auth/SupabaseAuthService';
+import type { AuthService } from '../features/auth/authTypes';
 import type { Routine } from '../features/routines/routineTypes';
 import { createDefaultRoutine } from '../features/routines/defaultRoutine';
 import { duplicateRoutine } from '../features/routines/routineOperations';
@@ -7,12 +10,32 @@ import { BrowserVoiceService } from '../features/voice/browserVoiceService';
 import { BrowserWakeLockService } from '../features/wakeLock/browserWakeLockService';
 import type { VoiceService } from '../features/voice/voiceService';
 import type { WakeLockService } from '../features/wakeLock/wakeLockService';
+import { AuthPage } from '../pages/AuthPage';
 import { AppRoutes } from './routes';
 
 const DEFAULT_ROUTINE_SEEDED_KEY = 'workout_timer_default_routine_seeded_v2';
 const DEFAULT_ROUTINE_NAME = '全身トレーニング';
 
 export function App() {
+  const authService = useMemo<AuthService>(() => new SupabaseAuthService(), []);
+
+  return <AuthenticatedApp authService={authService} />;
+}
+
+type AuthenticatedAppProps = {
+  authService: AuthService;
+};
+
+export function AuthenticatedApp({ authService }: AuthenticatedAppProps) {
+  return (
+    <AuthProvider authService={authService}>
+      <AppShell />
+    </AuthProvider>
+  );
+}
+
+function AppShell() {
+  const auth = useAuth();
   const repository = useMemo(() => new LocalStorageRoutineRepository(), []);
   const voiceService = useMemo<VoiceService>(() => new BrowserVoiceService(), []);
   const wakeLockService = useMemo<WakeLockService>(() => new BrowserWakeLockService(), []);
@@ -79,6 +102,14 @@ export function App() {
     await reload();
   }
 
+  if (auth.isLoading) {
+    return <LoadingPage />;
+  }
+
+  if (!auth.user) {
+    return <AuthPage onSignIn={auth.signIn} onSignUp={auth.signUp} />;
+  }
+
   return (
     <AppRoutes
       isLoaded={isLoaded}
@@ -86,8 +117,18 @@ export function App() {
       onSave={saveRoutine}
       onDelete={removeRoutine}
       onDuplicate={copyRoutine}
+      currentUserEmail={auth.user.email}
+      onSignOut={auth.signOut}
       voiceService={voiceService}
       wakeLockService={wakeLockService}
     />
+  );
+}
+
+function LoadingPage() {
+  return (
+    <main className="mx-auto grid min-h-screen w-full max-w-[720px] place-items-center p-4 text-[#241710] sm:p-5">
+      <p className="m-0 text-sm font-medium text-[#8a4b23]">読み込み中</p>
+    </main>
   );
 }

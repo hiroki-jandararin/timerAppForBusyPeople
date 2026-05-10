@@ -60,12 +60,12 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
         intervalDurationSec: Number(setIntervalDurationSec),
         setCount: Number(setCount),
         includeLastInterval,
-      }),
+      })
     );
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-[720px] p-4 text-[#241710] sm:p-5">
+    <main className="mx-auto min-h-screen w-full max-w-180 p-4 text-[#241710] sm:p-5">
       <header className="flex items-start justify-between gap-3">
         <button className={backLinkClass} onClick={onBack}>
           ← 戻る
@@ -192,7 +192,7 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
           ))}
         </div>
         <button
-          className="min-h-[60px] rounded-lg border border-[#e45112] bg-[#e95f1a] px-4 text-lg font-bold text-white shadow-sm shadow-[#f26a21]/20 transition active:translate-y-px"
+          className="min-h-15 rounded-lg border border-[#e45112] bg-[#e95f1a] px-4 text-lg font-bold text-white shadow-sm shadow-[#f26a21]/20 transition active:translate-y-px"
           onClick={save}
         >
           保存
