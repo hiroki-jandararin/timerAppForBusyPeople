@@ -6,6 +6,7 @@ type RoutineRow = {
   id: string;
   user_id: string;
   name: string;
+  target_duration_sec: number | null;
   items: RoutineItem[];
   created_at: string;
   updated_at: string;
@@ -30,7 +31,7 @@ export type SupabaseRoutineClient = {
   from: (table: 'routines') => RoutineQuery;
 };
 
-const SELECT_COLUMNS = 'id,user_id,name,items,created_at,updated_at';
+const SELECT_COLUMNS = 'id,user_id,name,target_duration_sec,items,created_at,updated_at';
 
 export class SupabaseRoutineRepository implements RoutineRepository {
   constructor(
@@ -82,6 +83,7 @@ function toRoutine(row: RoutineRow): Routine {
   return {
     id: row.id,
     name: row.name,
+    targetDurationSec: row.target_duration_sec,
     items: row.items,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -93,6 +95,7 @@ function toRow(routine: Routine, userId: string): RoutineRow {
     id: routine.id,
     user_id: userId,
     name: routine.name,
+    target_duration_sec: routine.targetDurationSec ?? null,
     items: routine.items,
     created_at: routine.createdAt,
     updated_at: routine.updatedAt,

@@ -5,6 +5,19 @@ import { createRoutine } from '../features/routines/routineFactory';
 import { RoutineEditPage } from './RoutineEditPage';
 
 describe('RoutineEditPage', () => {
+  it('予定時間、目標時間、差分を表示できる', async () => {
+    const user = userEvent.setup();
+
+    render(<RoutineEditPage routine={createRoutine('A')} existingRoutines={[]} onSave={vi.fn()} onBack={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: 'ワークアウト追加' }));
+    await user.type(screen.getByLabelText('目標時間（分）'), '1');
+
+    expect(screen.getByText('予定時間')).toBeInTheDocument();
+    expect(screen.getByText('0:30')).toBeInTheDocument();
+    expect(screen.getByText('30秒余裕')).toBeInTheDocument();
+  });
+
   it('編集画面でカードを追加できる', async () => {
     const user = userEvent.setup();
 

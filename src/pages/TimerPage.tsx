@@ -1,6 +1,11 @@
-import { useEffect, useReducer, useRef } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { TimerDisplay } from '../components/TimerDisplay';
-import { calculateTotalDuration } from '../features/routines/routineOperations';
+import {
+  calculateRemainingRoutineDuration,
+  calculateTotalDuration,
+  formatClockDuration,
+  formatJapaneseDuration,
+} from '../features/routines/routineTime';
 import type { Routine } from '../features/routines/routineTypes';
 import { announceForTransition } from '../features/timer/timerService';
 import { initialTimerState, timerReducer, type TimerAction } from '../features/timer/timerReducer';
@@ -15,8 +20,13 @@ type Props = {
   onBack: () => void;
 };
 
+const PRE_START_COUNTDOWN_SEC = 3;
+
 export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Props) {
   const [state, rawDispatch] = useReducer(timerReducer, initialTimerState);
+  const [plannedStartAtMs, setPlannedStartAtMs] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [finishedAtMs, setFinishedAtMs] = useState<number | null>(null);
   const stateRef = useRef<TimerState>(state);
   const buttonBase =
     'min-h-12 rounded-lg border px-3 font-bold shadow-sm transition active:translate-y-px';
@@ -29,6 +39,21 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
     const previous = stateRef.current;
     const next = timerReducer(previous, action);
     stateRef.current = next;
+    if (action.type === 'start') {
+      const plannedStart = Date.now() + PRE_START_COUNTDOWN_SEC * 1000;
+      setPlannedStartAtMs(plannedStart);
+      setFinishedAtMs(null);
+      setNowMs(Date.now());
+    }
+    if (next.status === 'finished' && previous.status !== 'finished') {
+      const finishedAt = Date.now();
+      setFinishedAtMs(finishedAt);
+      setNowMs(finishedAt);
+    }
+    if (action.type === 'end') {
+      setPlannedStartAtMs(null);
+      setFinishedAtMs(null);
+    }
     announceForTransition(previous, next, routine, voiceService);
     rawDispatch(action);
   }
@@ -44,6 +69,12 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
   }, [state.status, routine]);
 
   useEffect(() => {
+    if (state.status === 'idle' || state.status === 'finished') return undefined;
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [state.status]);
+
+  useEffect(() => {
     if (state.status === 'running' || state.status === 'countdown') {
       void wakeLockService.request();
     } else {
@@ -54,6 +85,9 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
     };
   }, [state.status, wakeLockService]);
 
+  const totalDuration = calculateTotalDuration(routine);
+  const timing = calculateTimingSummary(routine, state, plannedStartAtMs, finishedAtMs ?? nowMs);
+
   return (
     <main className="mx-auto grid min-h-screen w-full max-w-[720px] grid-rows-[auto_auto_1fr_auto] p-4 text-[#241710] sm:p-5">
       <header className="flex items-start justify-between gap-3 mb-3">
@@ -61,9 +95,21 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
           ← 戻る
         </button>
         <div className="rounded-full bg-[#f26a21] px-3 py-1.5 text-sm font-bold text-white">
-          合計 {formatDuration(calculateTotalDuration(routine))}
+          合計 {formatClockDuration(totalDuration)}
         </div>
       </header>
+      <section className="mb-3 grid grid-cols-2 gap-2 rounded-lg border border-[#f5a568] bg-[#fff0df] p-3 shadow-sm shadow-[#f26a21]/10">
+        <div>
+          <p className="m-0 text-xs font-black text-[#8a4b23]">予定終了</p>
+          <p className="m-0 mt-1 text-xl font-black text-[#b84b12]">{timing.plannedEndLabel}</p>
+        </div>
+        <div>
+          <p className="m-0 text-xs font-black text-[#8a4b23]">予定との差分</p>
+          <p className={`m-0 mt-1 text-xl font-black ${timing.deltaSec > 0 ? 'text-[#9c211b]' : 'text-[#2d6b2c]'}`}>
+            {timing.deltaLabel}
+          </p>
+        </div>
+      </section>
       <p className="mb-3 mt-3 rounded-lg border border-[#f5c198] bg-[#fff7ef] px-3 py-2 text-sm font-medium text-[#8a4b23]">
         画面を開いたまま使用してください
       </p>
@@ -111,8 +157,39 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
   );
 }
 
-function formatDuration(seconds: number): string {
-  const min = Math.floor(seconds / 60);
-  const sec = seconds % 60;
-  return `${min}分${sec}秒`;
+function calculateTimingSummary(
+  routine: Routine,
+  state: TimerState,
+  plannedStartAtMs: number | null,
+  nowMs: number,
+) {
+  const totalDuration = calculateTotalDuration(routine);
+  const plannedEndAtMs = plannedStartAtMs
+    ? plannedStartAtMs + totalDuration * 1000
+    : nowMs + totalDuration * 1000;
+  const projectedEndAtMs =
+    plannedStartAtMs && state.status !== 'countdown'
+      ? nowMs + calculateRemainingRoutineDuration(routine, state.currentIndex, state.remainingSec) * 1000
+      : plannedEndAtMs;
+  const deltaSec = plannedStartAtMs ? Math.round((projectedEndAtMs - plannedEndAtMs) / 1000) : 0;
+
+  return {
+    plannedEndLabel: formatTime(plannedEndAtMs),
+    deltaSec,
+    deltaLabel: plannedStartAtMs ? formatScheduleDifference(deltaSec) : '開始前',
+  };
+}
+
+function formatTime(timestampMs: number): string {
+  return new Intl.DateTimeFormat('ja-JP', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(timestampMs));
+}
+
+function formatScheduleDifference(seconds: number): string {
+  if (seconds === 0) return '予定通り';
+  const duration = formatJapaneseDuration(Math.abs(seconds));
+  return seconds > 0 ? `${duration}遅れ` : `${duration}早い`;
 }

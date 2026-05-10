@@ -24,6 +24,9 @@ describe('TimerPage', () => {
 
     expect(screen.getByRole('heading', { name: 'スクワット' })).toBeInTheDocument();
     expect(screen.getByLabelText('残り秒数')).toHaveTextContent('30');
+    expect(screen.getByText('予定終了')).toBeInTheDocument();
+    expect(screen.getByText('予定との差分')).toBeInTheDocument();
+    expect(screen.getByText('開始前')).toBeInTheDocument();
   });
 
   it('タイマー画面で現在の種目名と残り秒数が表示される', async () => {

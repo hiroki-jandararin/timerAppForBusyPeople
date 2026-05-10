@@ -7,6 +7,7 @@ export function createRoutine(name = '', now = new Date()): Routine {
   return {
     id: createId('routine'),
     name,
+    targetDurationSec: null,
     items: [],
     createdAt: timestamp,
     updatedAt: timestamp,

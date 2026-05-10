@@ -21,6 +21,7 @@ export type RoutineItem = WorkoutItem | IntervalItem;
 export type Routine = {
   id: string;
   name: string;
+  targetDurationSec?: number | null;
   items: RoutineItem[];
   createdAt: string;
   updatedAt: string;

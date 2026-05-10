@@ -1,5 +1,8 @@
 import { cloneRoutineItem, createRoutine, createRoutineItem } from './routineFactory';
 import type { Routine, RoutineItem, RoutineItemType } from './routineTypes';
+import { calculateTotalDuration } from './routineTime';
+
+export { calculateTotalDuration } from './routineTime';
 
 const nowIso = () => new Date().toISOString();
 
@@ -7,6 +10,14 @@ export function renameRoutine(routine: Routine, name: string): Routine {
   return {
     ...routine,
     name,
+    updatedAt: nowIso(),
+  };
+}
+
+export function updateRoutineTargetDuration(routine: Routine, targetDurationSec: number | null): Routine {
+  return {
+    ...routine,
+    targetDurationSec,
     updatedAt: nowIso(),
   };
 }
@@ -116,10 +127,6 @@ export function moveItemDown(routine: Routine, itemId: string): Routine {
   const index = routine.items.findIndex((item) => item.id === itemId);
   if (index < 0 || index >= routine.items.length - 1) return routine;
   return moveItem(routine, index, index + 1);
-}
-
-export function calculateTotalDuration(routine: Pick<Routine, 'items'>): number {
-  return routine.items.reduce((total, item) => total + item.durationSec, 0);
 }
 
 export function validateRoutine(routine: Routine, existingRoutines: Routine[] = []): string[] {

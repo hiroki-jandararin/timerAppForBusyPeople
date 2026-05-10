@@ -200,7 +200,7 @@ function TimerRoute({ isLoaded, routines, voiceService, wakeLockService }: Timer
 
 function LoadingPage() {
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-[720px] place-items-center p-4 text-[#241710] sm:p-5">
+    <main className="mx-auto grid min-h-screen w-full max-w-180 place-items-center p-4 text-[#241710] sm:p-5">
       <p className="m-0 text-sm font-medium text-[#8a4b23]">読み込み中</p>
     </main>
   );

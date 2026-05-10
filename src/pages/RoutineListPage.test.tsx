@@ -7,7 +7,7 @@ import { RoutineListPage } from './RoutineListPage';
 
 describe('RoutineListPage', () => {
   it('ルーティン一覧に保存済みルーティンが表示され、新規作成ボタンが表示される', () => {
-    const routine = addItem(createRoutine('全身トレA'), 'workout');
+    const routine = { ...addItem(createRoutine('全身トレA'), 'workout'), targetDurationSec: 60 };
 
     render(
       <RoutineListPage
@@ -21,6 +21,9 @@ describe('RoutineListPage', () => {
     );
 
     expect(screen.getByText('全身トレA')).toBeInTheDocument();
+    expect(screen.getByText('予定時間')).toBeInTheDocument();
+    expect(screen.getByText('0:30')).toBeInTheDocument();
+    expect(screen.getByText('30秒余裕')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '＋ 新規' })).toBeInTheDocument();
   });
 

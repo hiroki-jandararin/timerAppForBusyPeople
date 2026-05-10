@@ -10,6 +10,7 @@ describe('SupabaseRoutineRepository', () => {
         {
           id: 'routine_1',
           name: '全身トレA',
+          target_duration_sec: 2700,
           items: [
             {
               id: 'item_1',
@@ -30,6 +31,7 @@ describe('SupabaseRoutineRepository', () => {
       {
         id: 'routine_1',
         name: '全身トレA',
+        targetDurationSec: 2700,
         items: [
           {
             id: 'item_1',
@@ -50,7 +52,7 @@ describe('SupabaseRoutineRepository', () => {
   it('routineをuser_id付きでupsertする', async () => {
     const client = createClient();
     const repository = new SupabaseRoutineRepository('user-1', client);
-    const routine = addItem(createRoutine('全身トレA'), 'workout');
+    const routine = { ...addItem(createRoutine('全身トレA'), 'workout'), targetDurationSec: 2700 };
 
     await repository.save(routine);
 
@@ -58,6 +60,7 @@ describe('SupabaseRoutineRepository', () => {
       id: routine.id,
       user_id: 'user-1',
       name: routine.name,
+      target_duration_sec: 2700,
       items: routine.items,
       created_at: routine.createdAt,
       updated_at: routine.updatedAt,

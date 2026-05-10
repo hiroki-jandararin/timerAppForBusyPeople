@@ -8,9 +8,17 @@ import {
   moveItemDown,
   moveItemUp,
   renameRoutine,
+  updateRoutineTargetDuration,
   updateItem,
   validateRoutine,
 } from '../features/routines/routineOperations';
+import {
+  calculateTargetDifference,
+  calculateTotalDuration,
+  formatClockDuration,
+  formatSignedDifference,
+  getTargetDuration,
+} from '../features/routines/routineTime';
 import type { Routine, RoutineItem } from '../features/routines/routineTypes';
 
 type Props = {
@@ -23,6 +31,10 @@ type Props = {
 export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: Props) {
   const [draft, setDraft] = useState(routine);
   const [errors, setErrors] = useState<string[]>([]);
+  const [targetMinutes, setTargetMinutes] = useState(() => {
+    const targetDuration = getTargetDuration(routine);
+    return targetDuration === null ? '' : String(Math.floor(targetDuration / 60));
+  });
   const [isSetFormOpen, setIsSetFormOpen] = useState(false);
   const [setTitle, setSetTitle] = useState('ワークアウト');
   const [setWorkoutDurationSec, setSetWorkoutDurationSec] = useState('60');
@@ -41,6 +53,8 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
   const inputClass =
     'min-h-10 w-full rounded-lg border border-[#efc4a2] bg-[#fffdfa] px-3 text-sm text-[#241710] shadow-inner shadow-[#f2d5bd]/40 focus:border-[#f26a21] focus:outline-none focus:ring-2 focus:ring-[#f26a21]/20';
   const backLinkClass = 'border-0 bg-transparent p-0 text-sm font-bold text-[#8a4b23] shadow-none';
+  const totalDuration = calculateTotalDuration(draft);
+  const targetDifference = calculateTargetDifference(draft);
 
   function save() {
     const validationErrors = validateRoutine(draft, existingRoutines);
@@ -64,6 +78,19 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
     );
   }
 
+  function updateTargetDuration(value: string) {
+    setTargetMinutes(value);
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setDraft((current) => updateRoutineTargetDuration(current, null));
+      return;
+    }
+
+    const minutes = Math.max(1, Math.floor(Number(trimmed)));
+    if (!Number.isFinite(minutes)) return;
+    setDraft((current) => updateRoutineTargetDuration(current, minutes * 60));
+  }
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-180 p-4 text-[#241710] sm:p-5">
       <header className="flex items-start justify-between gap-3">
@@ -75,6 +102,23 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
         </button>
       </header>
       <section className="grid gap-3">
+        <section className="sticky top-3 z-10 grid gap-2 rounded-lg border border-[#f5a568] bg-[#fff0df] p-3 shadow-lg shadow-[#d96a1f]/10">
+          <div className="flex items-end justify-between gap-3">
+            <span className="text-sm font-black text-[#8a4b23]">予定時間</span>
+            <span className="text-4xl font-black leading-none text-[#b84b12]">
+              {formatClockDuration(totalDuration)}
+            </span>
+          </div>
+          <div
+            className={`rounded-lg px-3 py-2 text-sm font-bold ${
+              targetDifference === null || targetDifference >= 0
+                ? 'bg-[#eef8ef] text-[#2d6b2c]'
+                : 'bg-[#fff0ee] text-[#9c211b]'
+            }`}
+          >
+            {targetDifference === null ? '目標時間を設定すると差分を表示します' : formatSignedDifference(targetDifference)}
+          </div>
+        </section>
         <label className="grid gap-2 text-sm font-medium text-[#000000]">
           ルーティン名
           <input
@@ -82,6 +126,18 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
             value={draft.name}
             onChange={(event) => setDraft(renameRoutine(draft, event.target.value))}
             placeholder="ルーティン名を入力"
+          />
+        </label>
+        <label className="grid gap-2 text-sm font-medium text-[#000000]">
+          目標時間（分）
+          <input
+            className={inputClass}
+            type="number"
+            min="1"
+            inputMode="numeric"
+            value={targetMinutes}
+            onChange={(event) => updateTargetDuration(event.target.value)}
+            placeholder="45"
           />
         </label>
         <div className="grid grid-cols-2 gap-2">

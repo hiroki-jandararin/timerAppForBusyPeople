@@ -2,6 +2,7 @@ create table if not exists public.routines (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
+  target_duration_sec integer,
   items jsonb not null default '[]'::jsonb,
   created_at timestamptz not null,
   updated_at timestamptz not null
