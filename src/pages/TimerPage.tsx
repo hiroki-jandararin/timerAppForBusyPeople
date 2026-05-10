@@ -4,7 +4,6 @@ import {
   calculateRemainingRoutineDuration,
   calculateTotalDuration,
   formatClockDuration,
-  formatJapaneseDuration,
 } from '../features/routines/routineTime';
 import type { Routine } from '../features/routines/routineTypes';
 import { announceForTransition } from '../features/timer/timerService';
@@ -98,22 +97,16 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
           合計 {formatClockDuration(totalDuration)}
         </div>
       </header>
-      <section className="mb-3 grid grid-cols-2 gap-2 rounded-lg border border-[#f5a568] bg-[#fff0df] p-3 shadow-sm shadow-[#f26a21]/10">
-        <div>
-          <p className="m-0 text-xs font-black text-[#8a4b23]">予定終了</p>
-          <p className="m-0 mt-1 text-xl font-black text-[#b84b12]">{timing.plannedEndLabel}</p>
-        </div>
-        <div>
-          <p className="m-0 text-xs font-black text-[#8a4b23]">予定との差分</p>
-          <p className={`m-0 mt-1 text-xl font-black ${timing.deltaSec > 0 ? 'text-[#9c211b]' : 'text-[#2d6b2c]'}`}>
-            {timing.deltaLabel}
-          </p>
-        </div>
-      </section>
-      <p className="mb-3 mt-3 rounded-lg border border-[#f5c198] bg-[#fff7ef] px-3 py-2 text-sm font-medium text-[#8a4b23]">
+      <p className="mb-3 rounded-lg border border-[#f5c198] bg-[#fff7ef] px-3 py-2 text-sm font-medium text-[#8a4b23]">
         画面を開いたまま使用してください
       </p>
-      <TimerDisplay routine={routine} state={state} />
+      <TimerDisplay
+        routine={routine}
+        state={state}
+        plannedEndLabel={timing.plannedEndLabel}
+        scheduleDeltaLabel={timing.deltaLabel}
+        scheduleDeltaSec={timing.deltaSec}
+      />
       <div className="grid gap-3">
         {state.status === 'idle' || state.status === 'finished' ? (
           <button
@@ -190,6 +183,5 @@ function formatTime(timestampMs: number): string {
 
 function formatScheduleDifference(seconds: number): string {
   if (seconds === 0) return '予定通り';
-  const duration = formatJapaneseDuration(Math.abs(seconds));
-  return seconds > 0 ? `${duration}遅れ` : `${duration}早い`;
+  return seconds > 0 ? `${Math.abs(seconds)}秒遅れ` : `${Math.abs(seconds)}秒早い`;
 }

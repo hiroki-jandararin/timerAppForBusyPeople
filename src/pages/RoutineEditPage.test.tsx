@@ -8,10 +8,17 @@ describe('RoutineEditPage', () => {
   it('予定時間、目標時間、差分を表示できる', async () => {
     const user = userEvent.setup();
 
-    render(<RoutineEditPage routine={createRoutine('A')} existingRoutines={[]} onSave={vi.fn()} onBack={vi.fn()} />);
+    render(
+      <RoutineEditPage
+        routine={createRoutine('A')}
+        existingRoutines={[]}
+        onSave={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
 
     await user.click(screen.getByRole('button', { name: 'ワークアウト追加' }));
-    await user.type(screen.getByLabelText('目標時間（分）'), '1');
+    await user.type(screen.getByLabelText('目標筋トレ時間（分）'), '1');
 
     expect(screen.getByText('予定時間')).toBeInTheDocument();
     expect(screen.getByText('0:30')).toBeInTheDocument();
@@ -21,7 +28,14 @@ describe('RoutineEditPage', () => {
   it('編集画面でカードを追加できる', async () => {
     const user = userEvent.setup();
 
-    render(<RoutineEditPage routine={createRoutine('A')} existingRoutines={[]} onSave={vi.fn()} onBack={vi.fn()} />);
+    render(
+      <RoutineEditPage
+        routine={createRoutine('A')}
+        existingRoutines={[]}
+        onSave={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
 
     await user.click(screen.getByRole('button', { name: 'ワークアウト追加' }));
 
@@ -32,7 +46,14 @@ describe('RoutineEditPage', () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
 
-    render(<RoutineEditPage routine={createRoutine('A')} existingRoutines={[]} onSave={onSave} onBack={vi.fn()} />);
+    render(
+      <RoutineEditPage
+        routine={createRoutine('A')}
+        existingRoutines={[]}
+        onSave={onSave}
+        onBack={vi.fn()}
+      />
+    );
 
     await user.click(screen.getByRole('button', { name: 'ワークアウト追加' }));
     await user.click(screen.getAllByRole('button', { name: '保存' })[0]);
@@ -45,7 +66,14 @@ describe('RoutineEditPage', () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
 
-    render(<RoutineEditPage routine={createRoutine('A')} existingRoutines={[]} onSave={onSave} onBack={vi.fn()} />);
+    render(
+      <RoutineEditPage
+        routine={createRoutine('A')}
+        existingRoutines={[]}
+        onSave={onSave}
+        onBack={vi.fn()}
+      />
+    );
 
     await user.click(screen.getByRole('button', { name: /セット一括追加/ }));
     await user.clear(screen.getByLabelText('種目名'));
@@ -54,7 +82,12 @@ describe('RoutineEditPage', () => {
     await user.click(screen.getAllByRole('button', { name: '保存' })[0]);
 
     expect(onSave).toHaveBeenCalledOnce();
-    expect(onSave.mock.calls[0][0].items.map((item: { type: string; title: string }) => [item.type, item.title])).toEqual([
+    expect(
+      onSave.mock.calls[0][0].items.map((item: { type: string; title: string }) => [
+        item.type,
+        item.title,
+      ])
+    ).toEqual([
       ['workout', 'スクワット 1'],
       ['interval', '休憩'],
       ['workout', 'スクワット 2'],
@@ -66,7 +99,14 @@ describe('RoutineEditPage', () => {
   it('セット一括追加の秒数入力は空にでき、再入力しても先頭に0が残らない', async () => {
     const user = userEvent.setup();
 
-    render(<RoutineEditPage routine={createRoutine('A')} existingRoutines={[]} onSave={vi.fn()} onBack={vi.fn()} />);
+    render(
+      <RoutineEditPage
+        routine={createRoutine('A')}
+        existingRoutines={[]}
+        onSave={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
 
     await user.click(screen.getByRole('button', { name: /セット一括追加/ }));
     const workoutDurationInput = screen.getByLabelText('ワークアウト秒数') as HTMLInputElement;
@@ -95,7 +135,7 @@ describe('RoutineEditPage', () => {
         existingRoutines={[createRoutine('A')]}
         onSave={onSave}
         onBack={vi.fn()}
-      />,
+      />
     );
 
     await user.click(screen.getByRole('button', { name: 'ワークアウト追加' }));

@@ -116,7 +116,9 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
                 : 'bg-[#fff0ee] text-[#9c211b]'
             }`}
           >
-            {targetDifference === null ? '目標時間を設定すると差分を表示します' : formatSignedDifference(targetDifference)}
+            {targetDifference === null
+              ? '目標時間を設定すると差分を表示します'
+              : formatSignedDifference(targetDifference)}
           </div>
         </section>
         <label className="grid gap-2 text-sm font-medium text-[#000000]">
@@ -129,7 +131,7 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-[#000000]">
-          目標時間（分）
+          目標筋トレ時間（分）
           <input
             className={inputClass}
             type="number"

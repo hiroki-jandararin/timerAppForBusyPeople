@@ -18,14 +18,25 @@ function createTimerRoutine() {
   return routine;
 }
 
+function createWorkoutAndRestRoutine() {
+  let routine = createTimerRoutine();
+  routine = addItem(routine, 'interval');
+  routine = updateItem(routine, routine.items[1].id, { title: '休憩', durationSec: 20 });
+  routine = addItem(routine, 'workout');
+  routine = updateItem(routine, routine.items[2].id, { title: '腕立て伏せ', durationSec: 30 });
+  return routine;
+}
+
 describe('TimerPage', () => {
   it('開始前は最初のカードの秒数を表示する', () => {
     render(<TimerPage routine={createTimerRoutine()} voiceService={new MockVoiceService()} wakeLockService={wakeLockService} onBack={vi.fn()} />);
 
-    expect(screen.getByRole('heading', { name: 'スクワット' })).toBeInTheDocument();
+    expect(screen.getAllByText('スクワット')).not.toHaveLength(0);
     expect(screen.getByLabelText('残り秒数')).toHaveTextContent('30');
-    expect(screen.getByText('予定終了')).toBeInTheDocument();
-    expect(screen.getByText('予定との差分')).toBeInTheDocument();
+    expect(screen.getByText(/終了 /)).toBeInTheDocument();
+    expect(screen.getByText('今すぐ')).toBeInTheDocument();
+    expect(screen.getByText('次')).toBeInTheDocument();
+    expect(screen.getByText('開始ボタンを押す')).toBeInTheDocument();
     expect(screen.getByText('開始前')).toBeInTheDocument();
   });
 
@@ -37,7 +48,7 @@ describe('TimerPage', () => {
     await user.click(screen.getByRole('button', { name: '開始' }));
     expect(screen.getByText('開始まで')).toBeInTheDocument();
     expect(screen.getByLabelText('残り秒数')).toHaveTextContent('3');
-    expect(screen.getByText('最初: スクワット')).toBeInTheDocument();
+    expect(screen.getByText('スクワットの準備')).toBeInTheDocument();
   });
 
   it('開始直後はカウントダウン中の表示に変わる', async () => {
@@ -49,4 +60,20 @@ describe('TimerPage', () => {
 
     expect(screen.getByRole('button', { name: 'カウントダウン' })).toBeDisabled();
   });
+
+  it('休憩中は休憩終了までの残り時間と次の種目を強く表示する', async () => {
+    const user = userEvent.setup();
+
+    render(<TimerPage routine={createWorkoutAndRestRoutine()} voiceService={new MockVoiceService()} wakeLockService={wakeLockService} onBack={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: '開始' }));
+    await new Promise((resolve) => window.setTimeout(resolve, 3100));
+    await user.click(screen.getByRole('button', { name: '次へ' }));
+
+    expect(screen.getByLabelText('休憩終了までの残り秒数')).toHaveTextContent('20');
+    expect(screen.queryByText('休憩終了まで 20秒')).not.toBeInTheDocument();
+    expect(screen.getByText('腕立て伏せに備える')).toBeInTheDocument();
+    expect(screen.getByText('30秒早い')).toBeInTheDocument();
+    expect(screen.getAllByText('腕立て伏せ')).not.toHaveLength(0);
+  }, 10000);
 });
