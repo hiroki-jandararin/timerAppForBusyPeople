@@ -39,7 +39,7 @@ export function AuthPage({ onSignIn, onSignUp }: Props) {
   }
 
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-[520px] content-center p-4 text-[#241710] sm:p-5">
+    <main className="mx-auto grid min-h-screen w-full max-w-130 content-center p-4 text-[#241710] sm:p-5">
       <section className="rounded-lg border border-[#f4d0b3] bg-[#fffdfa] p-5 shadow-sm shadow-[#d96a1f]/5">
         <div className="mb-5">
           <h1 className="m-0 text-3xl font-black leading-tight">QuickFit Timer</h1>

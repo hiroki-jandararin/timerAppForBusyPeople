@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AuthProvider, useAuth } from '../features/auth/AuthProvider';
 import { SupabaseAuthService } from '../features/auth/SupabaseAuthService';
-import type { AuthService } from '../features/auth/authTypes';
+import type { AuthService, AuthUser } from '../features/auth/authTypes';
+import type { RoutineRepository } from '../features/routines/routineRepository';
 import type { Routine } from '../features/routines/routineTypes';
 import { createDefaultRoutine } from '../features/routines/defaultRoutine';
 import { duplicateRoutine } from '../features/routines/routineOperations';
-import { LocalStorageRoutineRepository } from '../features/routines/localStorageRoutineRepository';
+import { SupabaseRoutineRepository } from '../features/routines/supabaseRoutineRepository';
 import { BrowserVoiceService } from '../features/voice/browserVoiceService';
 import { BrowserWakeLockService } from '../features/wakeLock/browserWakeLockService';
 import type { VoiceService } from '../features/voice/voiceService';
@@ -16,6 +17,8 @@ import { AppRoutes } from './routes';
 const DEFAULT_ROUTINE_SEEDED_KEY = 'workout_timer_default_routine_seeded_v2';
 const DEFAULT_ROUTINE_NAME = '全身トレーニング';
 
+type CreateRoutineRepository = (user: AuthUser) => RoutineRepository;
+
 export function App() {
   const authService = useMemo<AuthService>(() => new SupabaseAuthService(), []);
 
@@ -24,19 +27,52 @@ export function App() {
 
 type AuthenticatedAppProps = {
   authService: AuthService;
+  createRoutineRepository?: CreateRoutineRepository;
 };
 
-export function AuthenticatedApp({ authService }: AuthenticatedAppProps) {
+export function AuthenticatedApp({
+  authService,
+  createRoutineRepository = (user) => new SupabaseRoutineRepository(user.id),
+}: AuthenticatedAppProps) {
   return (
     <AuthProvider authService={authService}>
-      <AppShell />
+      <AppShell createRoutineRepository={createRoutineRepository} />
     </AuthProvider>
   );
 }
 
-function AppShell() {
+type AppShellProps = {
+  createRoutineRepository: CreateRoutineRepository;
+};
+
+function AppShell({ createRoutineRepository }: AppShellProps) {
   const auth = useAuth();
-  const repository = useMemo(() => new LocalStorageRoutineRepository(), []);
+
+  if (auth.isLoading) {
+    return <LoadingPage />;
+  }
+
+  if (!auth.user) {
+    return <AuthPage onSignIn={auth.signIn} onSignUp={auth.signUp} />;
+  }
+
+  return (
+    <RoutineApp
+      user={auth.user}
+      createRoutineRepository={createRoutineRepository}
+      onSignOut={auth.signOut}
+    />
+  );
+}
+
+type RoutineAppProps = {
+  user: AuthUser;
+  createRoutineRepository: CreateRoutineRepository;
+  onSignOut: () => Promise<void>;
+};
+
+function RoutineApp({ user, createRoutineRepository, onSignOut }: RoutineAppProps) {
+  const repository = useMemo(() => createRoutineRepository(user), [createRoutineRepository, user]);
   const voiceService = useMemo<VoiceService>(() => new BrowserVoiceService(), []);
   const wakeLockService = useMemo<WakeLockService>(() => new BrowserWakeLockService(), []);
   const [routines, setRoutines] = useState<Routine[]>([]);
@@ -44,24 +80,25 @@ function AppShell() {
   const isSeedingDefaultRoutine = useRef(false);
 
   useEffect(() => {
+    setIsLoaded(false);
     void reload();
-  }, []);
+  }, [repository]);
 
   async function reload() {
     const savedRoutines = await repository.findAll();
     const normalizedRoutines = await removeDuplicatedDefaultRoutines(savedRoutines);
     const hasDefaultRoutine = normalizedRoutines.some(
-      (routine) => routine.name === DEFAULT_ROUTINE_NAME,
+      (routine) => routine.name === DEFAULT_ROUTINE_NAME
     );
     if (
       !hasDefaultRoutine &&
-      localStorage.getItem(DEFAULT_ROUTINE_SEEDED_KEY) !== 'true' &&
+      localStorage.getItem(createDefaultRoutineSeededKey(user.id)) !== 'true' &&
       !isSeedingDefaultRoutine.current
     ) {
       isSeedingDefaultRoutine.current = true;
       const defaultRoutine = createDefaultRoutine();
       await repository.save(defaultRoutine);
-      localStorage.setItem(DEFAULT_ROUTINE_SEEDED_KEY, 'true');
+      localStorage.setItem(createDefaultRoutineSeededKey(user.id), 'true');
       setRoutines([...normalizedRoutines, defaultRoutine]);
       setIsLoaded(true);
       isSeedingDefaultRoutine.current = false;
@@ -73,14 +110,14 @@ function AppShell() {
 
   async function removeDuplicatedDefaultRoutines(savedRoutines: Routine[]) {
     const defaultRoutines = savedRoutines.filter(
-      (routine) => routine.name === DEFAULT_ROUTINE_NAME,
+      (routine) => routine.name === DEFAULT_ROUTINE_NAME
     );
     if (defaultRoutines.length <= 1) return savedRoutines;
 
     const [, ...duplicatedDefaults] = defaultRoutines;
     await Promise.all(duplicatedDefaults.map((routine) => repository.delete(routine.id)));
     return savedRoutines.filter(
-      (routine) => !duplicatedDefaults.some((duplicated) => duplicated.id === routine.id),
+      (routine) => !duplicatedDefaults.some((duplicated) => duplicated.id === routine.id)
     );
   }
 
@@ -102,14 +139,6 @@ function AppShell() {
     await reload();
   }
 
-  if (auth.isLoading) {
-    return <LoadingPage />;
-  }
-
-  if (!auth.user) {
-    return <AuthPage onSignIn={auth.signIn} onSignUp={auth.signUp} />;
-  }
-
   return (
     <AppRoutes
       isLoaded={isLoaded}
@@ -117,17 +146,21 @@ function AppShell() {
       onSave={saveRoutine}
       onDelete={removeRoutine}
       onDuplicate={copyRoutine}
-      currentUserEmail={auth.user.email}
-      onSignOut={auth.signOut}
+      currentUserEmail={user.email}
+      onSignOut={onSignOut}
       voiceService={voiceService}
       wakeLockService={wakeLockService}
     />
   );
 }
 
+function createDefaultRoutineSeededKey(userId: string) {
+  return `${DEFAULT_ROUTINE_SEEDED_KEY}_${userId}`;
+}
+
 function LoadingPage() {
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-[720px] place-items-center p-4 text-[#241710] sm:p-5">
+    <main className="mx-auto grid min-h-screen w-full max-w-180 place-items-center p-4 text-[#241710] sm:p-5">
       <p className="m-0 text-sm font-medium text-[#8a4b23]">読み込み中</p>
     </main>
   );

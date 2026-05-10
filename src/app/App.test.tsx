@@ -2,7 +2,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AuthenticatedApp } from './App';
-import { STORAGE_KEY } from '../features/routines/localStorageRoutineRepository';
+import {
+  LocalStorageRoutineRepository,
+  STORAGE_KEY,
+} from '../features/routines/localStorageRoutineRepository';
 import type { AuthService, AuthUser } from '../features/auth/authTypes';
 
 describe('App', () => {
@@ -21,7 +24,12 @@ describe('App', () => {
   it('新しいルーティンは保存を押すまでリストに出ない', async () => {
     const user = userEvent.setup();
 
-    render(<AuthenticatedApp authService={createSignedInAuthService()} />);
+    render(
+      <AuthenticatedApp
+        authService={createSignedInAuthService()}
+        createRoutineRepository={() => new LocalStorageRoutineRepository()}
+      />,
+    );
 
     await screen.findByText('全身トレーニング');
 
@@ -38,7 +46,12 @@ describe('App', () => {
   });
 
   it('未ログイン時はログイン画面を表示する', async () => {
-    render(<AuthenticatedApp authService={createAuthService(null)} />);
+    render(
+      <AuthenticatedApp
+        authService={createAuthService(null)}
+        createRoutineRepository={() => new LocalStorageRoutineRepository()}
+      />,
+    );
 
     expect(await screen.findByRole('button', { name: 'ログイン' })).toBeInTheDocument();
     expect(screen.queryByText('全身トレーニング')).not.toBeInTheDocument();
