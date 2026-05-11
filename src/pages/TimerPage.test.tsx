@@ -109,6 +109,8 @@ describe('TimerPage', () => {
       expect(screen.getByText('休憩短縮')).toBeInTheDocument();
       expect(screen.getByText(/休憩を合計60秒短縮できます/)).toBeInTheDocument();
       expect(screen.getByText('この先の休憩2件を同じ割合で短くします。')).toBeInTheDocument();
+      expect(screen.getByText('90秒 → 45秒（-45秒）')).toBeInTheDocument();
+      expect(screen.getByText('30秒 → 15秒（-15秒）')).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: '休憩を短縮する' }));
 

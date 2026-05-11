@@ -27,6 +27,12 @@ type RestShorteningPlan = {
   routine: Routine;
   recoveredSec: number;
   changedCount: number;
+  changes: Array<{
+    title: string;
+    beforeSec: number;
+    afterSec: number;
+    shortenedSec: number;
+  }>;
 };
 
 export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Props) {
@@ -230,6 +236,19 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
               <p className="m-0 mt-1 text-sm font-bold text-[#6d5a4d]">
                 この先の休憩{restShorteningPlan.changedCount}件を同じ割合で短くします。
               </p>
+              <div className="mt-3 grid gap-2">
+                {restShorteningPlan.changes.map((change, index) => (
+                  <div
+                    key={`${change.title}-${index}`}
+                    className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-lg bg-white/75 px-3 py-2 text-sm"
+                  >
+                    <span className="font-bold text-[#4b392e]">{change.title}</span>
+                    <span className="font-black text-[#9c211b]">
+                      {change.beforeSec}秒 → {change.afterSec}秒（-{change.shortenedSec}秒）
+                    </span>
+                  </div>
+                ))}
+              </div>
             </article>
             <button className={`${primaryButtonClass} min-h-12`} onClick={applyRestShortening}>
               休憩を短縮する
@@ -294,6 +313,7 @@ function createRestShorteningPlan(
       routine,
       recoveredSec: 0,
       changedCount: 0,
+      changes: [],
     };
   }
 
@@ -335,12 +355,24 @@ function createRestShorteningPlan(
       durationSec: item.durationSec - shortenSec,
     };
   });
+  const changes = shortenPlans
+    .filter((plan) => plan.shortenSec > 0)
+    .map((plan) => {
+      const item = routine.items[plan.index];
+      return {
+        title: item.title,
+        beforeSec: item.durationSec,
+        afterSec: item.durationSec - plan.shortenSec,
+        shortenedSec: plan.shortenSec,
+      };
+    });
 
   return {
     routine:
       recoveredSec > 0 ? { ...routine, items, updatedAt: new Date().toISOString() } : routine,
     recoveredSec,
-    changedCount: shortenPlans.filter((plan) => plan.shortenSec > 0).length,
+    changedCount: changes.length,
+    changes,
   };
 }
 
