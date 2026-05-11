@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { createRoutine } from '../features/routines/routineFactory';
@@ -24,6 +24,19 @@ function createWorkoutAndRestRoutine() {
   routine = updateItem(routine, routine.items[1].id, { title: '休憩', durationSec: 20 });
   routine = addItem(routine, 'workout');
   routine = updateItem(routine, routine.items[2].id, { title: '腕立て伏せ', durationSec: 30 });
+  return routine;
+}
+
+function createRoutineWithMultipleRests() {
+  let routine = createTimerRoutine();
+  routine = addItem(routine, 'interval');
+  routine = updateItem(routine, routine.items[1].id, { title: '休憩', durationSec: 90 });
+  routine = addItem(routine, 'workout');
+  routine = updateItem(routine, routine.items[2].id, { title: '腕立て伏せ', durationSec: 30 });
+  routine = addItem(routine, 'interval');
+  routine = updateItem(routine, routine.items[3].id, { title: '休憩', durationSec: 30 });
+  routine = addItem(routine, 'workout');
+  routine = updateItem(routine, routine.items[4].id, { title: '腹筋', durationSec: 30 });
   return routine;
 }
 
@@ -76,4 +89,43 @@ describe('TimerPage', () => {
     expect(screen.getByText('30秒早い')).toBeInTheDocument();
     expect(screen.getAllByText('腕立て伏せ')).not.toHaveLength(0);
   }, 10000);
+
+  it('60秒以上遅れたら休憩短縮を確認し、適用するとこの先の休憩を同じ割合で短くする', async () => {
+    vi.useFakeTimers();
+
+    try {
+      render(<TimerPage routine={createRoutineWithMultipleRests()} voiceService={new MockVoiceService()} wakeLockService={wakeLockService} onBack={vi.fn()} />);
+
+      fireEvent.click(screen.getByRole('button', { name: '開始' }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3100);
+      });
+      fireEvent.click(screen.getByRole('button', { name: '一時停止' }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60000);
+      });
+
+      expect(screen.getByRole('dialog', { name: 'この先の休憩を短縮しますか？' })).toBeInTheDocument();
+      expect(screen.getByText('休憩短縮')).toBeInTheDocument();
+      expect(screen.getByText(/休憩を合計60秒短縮できます/)).toBeInTheDocument();
+      expect(screen.getByText('この先の休憩2件を同じ割合で短くします。')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: '休憩を短縮する' }));
+
+      expect(screen.getByRole('button', { name: '一時停止' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '再開' })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: '次へ' }));
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByLabelText('休憩終了までの残り秒数')).toHaveTextContent('45');
+
+      fireEvent.click(screen.getByRole('button', { name: '次へ' }));
+      fireEvent.click(screen.getByRole('button', { name: '次へ' }));
+
+      expect(screen.getByLabelText('休憩終了までの残り秒数')).toHaveTextContent('15');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
