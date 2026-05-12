@@ -48,7 +48,7 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
   const buttonBase =
     'min-h-12 rounded-lg border px-3 font-bold shadow-sm transition active:translate-y-px';
   const buttonClass = `${buttonBase} border-[#efc4a2] bg-[#fffdfa] text-[#241710]`;
-  const primaryButtonClass = `${buttonBase} border-[#e45112] bg-[#e95f1a] text-white shadow-[#f26a21]/25`;
+  const primaryButtonClass = `${buttonBase} border-[#d95f1a] bg-[#e95f1a] text-white shadow-[#f26a21]/20`;
   const dangerButtonClass = `${buttonBase} border-[#c8332c] bg-[#fffdfa] text-[#c8332c]`;
   const backLinkClass = 'border-0 bg-transparent p-0 text-sm font-bold text-[#8a4b23] shadow-none';
 
@@ -148,7 +148,7 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
   }
 
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-[720px] grid-rows-[auto_auto_1fr_auto] p-4 text-[#241710] sm:p-5">
+    <main className="mx-auto grid min-h-screen w-full max-w-180 grid-rows-[auto_auto_1fr_auto] p-4 text-[#241710] sm:p-5">
       <header className="flex items-start justify-between gap-3 mb-3">
         <button className={backLinkClass} onClick={onBack}>
           ← 戻る
@@ -166,51 +166,43 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
         plannedEndLabel={timing.plannedEndLabel}
         scheduleDeltaLabel={timing.deltaLabel}
         scheduleDeltaSec={timing.deltaSec}
+        onPrevious={() => dispatch({ type: 'previous', routine: activeRoutine })}
+        onNext={() => dispatch({ type: 'skip', routine: activeRoutine })}
+        controls={
+          <div className="grid gap-3">
+            {state.status === 'idle' || state.status === 'finished' ? (
+              <button
+                className={`${primaryButtonClass} min-h-15 text-lg`}
+                onClick={() => dispatch({ type: 'start', routine: activeRoutine })}
+              >
+                開始
+              </button>
+            ) : state.status === 'running' ? (
+              <button
+                className={`${primaryButtonClass} min-h-15 text-lg`}
+                onClick={() => dispatch({ type: 'pause' })}
+              >
+                一時停止
+              </button>
+            ) : state.status === 'countdown' ? (
+              <button className={`${primaryButtonClass} min-h-15 text-lg`} disabled>
+                カウントダウン
+              </button>
+            ) : (
+              <button
+                className={`${primaryButtonClass} min-h-15 text-lg`}
+                onClick={() => dispatch({ type: 'resume' })}
+              >
+                再開
+              </button>
+            )}
+          </div>
+        }
       />
-      <div className="grid gap-3">
-        {state.status === 'idle' || state.status === 'finished' ? (
-          <button
-            className={`${primaryButtonClass} min-h-[60px] text-lg`}
-            onClick={() => dispatch({ type: 'start', routine: activeRoutine })}
-          >
-            開始
-          </button>
-        ) : state.status === 'running' ? (
-          <button
-            className={`${primaryButtonClass} min-h-[60px] text-lg`}
-            onClick={() => dispatch({ type: 'pause' })}
-          >
-            一時停止
-          </button>
-        ) : state.status === 'countdown' ? (
-          <button className={`${primaryButtonClass} min-h-[60px] text-lg`} disabled>
-            カウントダウン
-          </button>
-        ) : (
-          <button
-            className={`${primaryButtonClass} min-h-[60px] text-lg`}
-            onClick={() => dispatch({ type: 'resume' })}
-          >
-            再開
-          </button>
-        )}
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <button
-            className={buttonClass}
-            onClick={() => dispatch({ type: 'previous', routine: activeRoutine })}
-          >
-            前へ
-          </button>
-          <button
-            className={buttonClass}
-            onClick={() => dispatch({ type: 'skip', routine: activeRoutine })}
-          >
-            次へ
-          </button>
-          <button className={dangerButtonClass} onClick={() => dispatch({ type: 'finish' })}>
-            終了
-          </button>
-        </div>
+      <div className="grid gap-2">
+        <button className={dangerButtonClass} onClick={() => dispatch({ type: 'finish' })}>
+          終了
+        </button>
       </div>
       {isAdjustmentPromptOpen && (
         <div
@@ -219,7 +211,7 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
           aria-modal="true"
           aria-labelledby="adjustment-suggestion-title"
         >
-          <section className="grid w-full max-w-[420px] gap-4 rounded-lg border border-[#f0b3a2] bg-[#fffdfa] p-4 text-left text-[#241710] shadow-2xl">
+          <section className="grid w-full max-w-105 gap-4 rounded-lg border border-[#f0b3a2] bg-[#fffdfa] p-4 text-left text-[#241710] shadow-2xl">
             <div className="grid gap-1">
               <p className="m-0 text-sm font-black text-[#9c211b]">
                 {formatScheduleDifference(timing.deltaSec)}
@@ -282,7 +274,7 @@ function calculateTimingSummary(
   const deltaSec = plannedStartAtMs ? Math.round((projectedEndAtMs - plannedEnd) / 1000) : 0;
 
   return {
-    plannedEndLabel: formatTime(plannedEnd),
+    plannedEndLabel: state.status === 'finished' ? formatTime(nowMs) : formatTime(plannedEnd),
     deltaSec,
     deltaLabel: plannedStartAtMs ? formatScheduleDifference(deltaSec) : '開始前',
   };

@@ -46,10 +46,8 @@ describe('TimerPage', () => {
 
     expect(screen.getAllByText('スクワット')).not.toHaveLength(0);
     expect(screen.getByLabelText('残り秒数')).toHaveTextContent('30');
-    expect(screen.getByText(/終了 /)).toBeInTheDocument();
-    expect(screen.getByText('今すぐ')).toBeInTheDocument();
-    expect(screen.getByText('次')).toBeInTheDocument();
-    expect(screen.getByText('開始ボタンを押す')).toBeInTheDocument();
+    expect(screen.getByText(/終了予定時刻/)).toBeInTheDocument();
+    expect(screen.getByText('次へ')).toBeInTheDocument();
     expect(screen.getByText('開始前')).toBeInTheDocument();
   });
 
@@ -61,7 +59,6 @@ describe('TimerPage', () => {
     await user.click(screen.getByRole('button', { name: '開始' }));
     expect(screen.getByText('開始まで')).toBeInTheDocument();
     expect(screen.getByLabelText('残り秒数')).toHaveTextContent('3');
-    expect(screen.getByText('スクワットの準備')).toBeInTheDocument();
   });
 
   it('開始直後はカウントダウン中の表示に変わる', async () => {
@@ -74,21 +71,44 @@ describe('TimerPage', () => {
     expect(screen.getByRole('button', { name: 'カウントダウン' })).toBeDisabled();
   });
 
+  it('終了後は終了予定時刻ではなく実際の終了時刻を表示する', () => {
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(new Date(2026, 0, 1, 12, 34, 0));
+      render(<TimerPage routine={createTimerRoutine()} voiceService={new MockVoiceService()} wakeLockService={wakeLockService} onBack={vi.fn()} />);
+
+      fireEvent.click(screen.getByRole('button', { name: '開始' }));
+      vi.setSystemTime(new Date(2026, 0, 1, 12, 35, 0));
+      fireEvent.click(screen.getByRole('button', { name: '終了' }));
+
+      expect(screen.getByText(/終了時刻/)).toHaveTextContent('12:35');
+      expect(screen.queryByText(/終了予定時刻/)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('休憩中は休憩終了までの残り時間と次の種目を強く表示する', async () => {
-    const user = userEvent.setup();
+    vi.useFakeTimers();
 
-    render(<TimerPage routine={createWorkoutAndRestRoutine()} voiceService={new MockVoiceService()} wakeLockService={wakeLockService} onBack={vi.fn()} />);
+    try {
+      render(<TimerPage routine={createWorkoutAndRestRoutine()} voiceService={new MockVoiceService()} wakeLockService={wakeLockService} onBack={vi.fn()} />);
 
-    await user.click(screen.getByRole('button', { name: '開始' }));
-    await new Promise((resolve) => window.setTimeout(resolve, 3100));
-    await user.click(screen.getByRole('button', { name: '次へ' }));
+      fireEvent.click(screen.getByRole('button', { name: '開始' }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3100);
+      });
+      fireEvent.click(screen.getByRole('button', { name: '次の種目へ移動' }));
 
-    expect(screen.getByLabelText('休憩終了までの残り秒数')).toHaveTextContent('20');
-    expect(screen.queryByText('休憩終了まで 20秒')).not.toBeInTheDocument();
-    expect(screen.getByText('腕立て伏せに備える')).toBeInTheDocument();
-    expect(screen.getByText('30秒早い')).toBeInTheDocument();
-    expect(screen.getAllByText('腕立て伏せ')).not.toHaveLength(0);
-  }, 10000);
+      expect(screen.getByLabelText('休憩終了までの残り秒数')).toHaveTextContent('20');
+      expect(screen.queryByText('休憩終了まで 20秒')).not.toBeInTheDocument();
+      expect(screen.getByText('30秒早い')).toBeInTheDocument();
+      expect(screen.getAllByText('腕立て伏せ')).not.toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it('60秒以上遅れたら休憩短縮を確認し、適用するとこの先の休憩を同じ割合で短くする', async () => {
     vi.useFakeTimers();
@@ -117,13 +137,13 @@ describe('TimerPage', () => {
       expect(screen.getByRole('button', { name: '一時停止' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '再開' })).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: '次へ' }));
+      fireEvent.click(screen.getByRole('button', { name: '次の種目へ移動' }));
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(screen.getByLabelText('休憩終了までの残り秒数')).toHaveTextContent('45');
 
-      fireEvent.click(screen.getByRole('button', { name: '次へ' }));
-      fireEvent.click(screen.getByRole('button', { name: '次へ' }));
+      fireEvent.click(screen.getByRole('button', { name: '次の種目へ移動' }));
+      fireEvent.click(screen.getByRole('button', { name: '次の種目へ移動' }));
 
       expect(screen.getByLabelText('休憩終了までの残り秒数')).toHaveTextContent('15');
     } finally {

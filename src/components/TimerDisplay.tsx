@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Routine, RoutineItem } from '../features/routines/routineTypes';
 import type { TimerState } from '../features/timer/timerTypes';
 
@@ -7,6 +8,9 @@ type Props = {
   plannedEndLabel: string;
   scheduleDeltaLabel: string;
   scheduleDeltaSec: number;
+  onPrevious: () => void;
+  onNext: () => void;
+  controls: ReactNode;
 };
 
 export function TimerDisplay({
@@ -15,23 +19,30 @@ export function TimerDisplay({
   plannedEndLabel,
   scheduleDeltaLabel,
   scheduleDeltaSec,
+  onPrevious,
+  onNext,
+  controls,
 }: Props) {
   const current = routine.items[state.currentIndex];
+  const previous = routine.items[state.currentIndex - 1];
   const next = routine.items[state.currentIndex + 1];
   const completed = state.status === 'finished' ? routine.items.length : state.currentIndex;
-  const progress = routine.items.length === 0 ? 0 : Math.round((completed / routine.items.length) * 100);
+  const progress =
+    routine.items.length === 0 ? 0 : Math.round((completed / routine.items.length) * 100);
   const isCountdown = state.status === 'countdown';
   const isRest = !isCountdown && current?.type === 'interval' && state.status !== 'finished';
   const isFinished = state.status === 'finished';
   const isLate = scheduleDeltaSec > 0;
-  const displayRemainingSec = state.status === 'idle' ? current?.durationSec ?? 0 : state.remainingSec;
+  const displayRemainingSec =
+    state.status === 'idle' ? (current?.durationSec ?? 0) : state.remainingSec;
   const visibleItems = getVisibleItems(routine.items, state.currentIndex);
-  const action = getActionMessage(state, current, next);
   const tone = getTimerTone({ isFinished, isLate, isRest, isCountdown });
   const resultMessage = formatFinishedMessage(scheduleDeltaSec);
   const currentDurationSec = current?.durationSec ?? displayRemainingSec;
   const remainingRatio =
-    currentDurationSec <= 0 ? 0 : Math.max(0, Math.min(1, displayRemainingSec / currentDurationSec));
+    currentDurationSec <= 0
+      ? 0
+      : Math.max(0, Math.min(1, displayRemainingSec / currentDurationSec));
   const ringRadius = 54;
   const ringCircumference = 2 * Math.PI * ringRadius;
   const ringOffset = ringCircumference * (1 - remainingRatio);
@@ -42,9 +53,11 @@ export function TimerDisplay({
         <div className={`grid gap-4 rounded-lg border p-4 text-center ${tone.panelClass}`}>
           <div className="flex items-center justify-between gap-3 text-left">
             <p className="m-0 rounded-lg bg-white/75 px-3 py-1 text-sm font-black">{tone.label}</p>
-            <p className="m-0 text-sm font-black">終了 {plannedEndLabel}</p>
+            <p className="m-0 rounded-lg bg-white/75 px-3 py-1.5 text-lg font-black leading-none">
+              終了時刻　 {plannedEndLabel}
+            </p>
           </div>
-          <div className="grid min-h-[240px] content-center gap-3 rounded-lg bg-white/75 px-4 py-6">
+          <div className="grid min-h-60 content-center gap-3 rounded-lg bg-white/75 px-4 py-6">
             <p className="m-0 text-sm font-black opacity-75">結果</p>
             <p className="m-0 text-center text-[clamp(1.8rem,7vw,3.2rem)] font-black leading-[1.18]">
               {resultMessage.prefix}
@@ -56,18 +69,23 @@ export function TimerDisplay({
           </div>
         </div>
       ) : (
-      <div className={`grid gap-4 rounded-lg border p-4 text-left ${tone.panelClass}`}>
-        <div className="flex items-center justify-between gap-3">
-          <p className="m-0 rounded-lg bg-white/75 px-3 py-1 text-sm font-black">{tone.label}</p>
-          <p className="m-0 text-sm font-black">終了 {plannedEndLabel}</p>
-        </div>
-        <div>
-          <p className="m-0 text-sm font-black opacity-85">今すぐ</p>
-          <p className="m-0 mt-1 text-[clamp(1.8rem,8vw,3.4rem)] font-black leading-tight">{action}</p>
-        </div>
-        <div className="grid justify-items-center gap-3">
-          <div className="relative grid aspect-square w-full max-w-[360px] place-items-center" aria-label="現在カードの残り時間ゲージ">
-              <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
+        <div className={`grid gap-4 rounded-lg border p-4 text-left ${tone.panelClass}`}>
+          <div className="flex items-center justify-between gap-3">
+            <p className="m-0 rounded-lg bg-white/75 px-3 py-1 text-sm font-black">{tone.label}</p>
+            <p className="m-0 rounded-lg bg-white/75 px-3 py-1.5 text-lg font-black leading-none">
+              終了予定時刻：{plannedEndLabel}
+            </p>
+          </div>
+          <div className="grid justify-items-center gap-3">
+            <div
+              className="relative grid aspect-square w-full max-w-90 place-items-center"
+              aria-label="現在カードの残り時間ゲージ"
+            >
+              <svg
+                className="absolute inset-0 h-full w-full -rotate-90"
+                viewBox="0 0 120 120"
+                aria-hidden="true"
+              >
                 <circle
                   cx="60"
                   cy="60"
@@ -107,39 +125,58 @@ export function TimerDisplay({
                 <p className="m-0 text-sm font-black opacity-80">秒</p>
               </div>
             </div>
-          <div className="grid w-full gap-1 rounded-lg bg-white/75 px-3 py-3 text-center">
-            <p className="m-0 text-xs font-black opacity-75">
-              {isRest ? 'レスト' : formatType(current)}
-            </p>
-            <p className="m-0 text-[clamp(1.8rem,8vw,3.2rem)] font-black leading-tight">
-              {isCountdown ? current?.title ?? 'なし' : current?.title ?? 'カードなし'}
-            </p>
+            <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,2.2fr)_minmax(0,1fr)] items-stretch gap-2 rounded-lg bg-white/75 px-2 py-2 text-center sm:px-3">
+              <AdjacentWorkout
+                direction="previous"
+                item={previous}
+                tone={tone}
+                onClick={onPrevious}
+              />
+              <div className="grid min-h-22 content-center gap-1 rounded-lg bg-white/80 px-2 py-2">
+                <p className="m-0 text-xs font-black opacity-75">
+                  {isRest ? 'レスト' : formatType(current)}
+                </p>
+                <p className="m-0 text-[clamp(1.6rem,6vw,2.8rem)] font-black leading-tight">
+                  {isCountdown ? (current?.title ?? 'なし') : (current?.title ?? 'カードなし')}
+                </p>
+              </div>
+              <AdjacentWorkout
+                direction="next"
+                item={isCountdown ? current : next}
+                tone={tone}
+                onClick={onNext}
+              />
+            </div>
           </div>
+          <div
+            className={`rounded-lg bg-white/75 px-3 py-2 text-center text-2xl font-black leading-tight ${isLate ? 'text-[#9c211b]' : 'text-[#2d6b2c]'}`}
+          >
+            {scheduleDeltaLabel}
+          </div>
+          {controls}
         </div>
-        <div className="grid gap-1 rounded-lg bg-white/75 px-3 py-2">
-          <p className="m-0 text-xs font-black opacity-75">次</p>
-          <p className="m-0 text-xl font-black leading-tight">
-            {isCountdown ? current?.title ?? 'なし' : next?.title ?? 'なし'}
-          </p>
-        </div>
-        <div className={`rounded-lg bg-white/75 px-3 py-2 text-center text-2xl font-black leading-tight ${isLate ? 'text-[#9c211b]' : 'text-[#2d6b2c]'}`}>
-          {scheduleDeltaLabel}
-        </div>
-      </div>
       )}
 
-      <div className="h-4 overflow-hidden rounded-full bg-[#f5d4bb] shadow-inner" aria-label="全体進捗">
+      <div
+        className="h-4 overflow-hidden rounded-full bg-[#f5d4bb] shadow-inner"
+        aria-label="全体進捗"
+      >
         <div className="h-full rounded-full bg-[#f26a21]" style={{ width: `${progress}%` }} />
       </div>
       <p className="m-0 text-sm font-bold text-[#8a4b23]">
         {Math.min(state.currentIndex + 1, routine.items.length)} / {routine.items.length}
       </p>
-      <div className="mt-3 rounded-lg border border-[#f1c29b] bg-[#fff7ef] p-3 text-left" aria-label="現在の位置">
+      <div
+        className="mt-3 rounded-lg border border-[#f1c29b] bg-[#fff7ef] p-3 text-left"
+        aria-label="現在の位置"
+      >
         <div className="mb-2 flex items-center justify-between gap-3">
           <h2 className="m-0 text-sm font-bold text-[#8a4b23]">現在の位置</h2>
-          <span className="rounded-full bg-[#f26a21] px-2.5 py-1 text-xs font-bold text-white">{progress}%</span>
+          <span className="rounded-full bg-[#f26a21] px-2.5 py-1 text-xs font-bold text-white">
+            {progress}%
+          </span>
         </div>
-      <div className="grid gap-2">
+        <div className="grid gap-2">
           {visibleItems.map(({ item, index }) => {
             const isCurrent = state.status !== 'finished' && index === state.currentIndex;
             const isDone = state.status === 'finished' || index < state.currentIndex;
@@ -153,12 +190,20 @@ export function TimerDisplay({
                       ? 'border-[#ead8c7] bg-[#fffdfa] text-[#8a7465]'
                       : 'border-[#ead8c7] bg-white text-[#4b392e]'
                 }`}
+              >
+                <span
+                  className={`grid h-6 w-6 place-items-center rounded-lg text-xs ${isCurrent ? 'bg-[#f26a21] font-black text-white' : isDone ? 'bg-[#d8e2e8] font-bold text-[#5c7485]' : 'bg-[#fff0df] font-bold text-[#b84b12]'}`}
                 >
-                <span className={`grid h-6 w-6 place-items-center rounded-lg text-xs ${isCurrent ? 'bg-[#f26a21] font-black text-white' : isDone ? 'bg-[#d8e2e8] font-bold text-[#5c7485]' : 'bg-[#fff0df] font-bold text-[#b84b12]'}`}>
                   {isDone ? '✓' : index + 1}
                 </span>
-                <span className={`truncate ${isCurrent ? 'font-black' : 'font-medium'}`}>{item.title}</span>
-                <span className={`rounded-lg border px-2 py-0.5 text-xs font-bold ${item.type === 'interval' ? 'border-[#cfd9e0] bg-[#f1f5f8] text-[#577082]' : 'border-[#f5a568] bg-[#fffdfa] text-[#b84b12]'}`}>{item.durationSec}秒</span>
+                <span className={`truncate ${isCurrent ? 'font-black' : 'font-medium'}`}>
+                  {item.title}
+                </span>
+                <span
+                  className={`rounded-lg border px-2 py-0.5 text-xs font-bold ${item.type === 'interval' ? 'border-[#cfd9e0] bg-[#f1f5f8] text-[#577082]' : 'border-[#f5a568] bg-[#fffdfa] text-[#b84b12]'}`}
+                >
+                  {item.durationSec}秒
+                </span>
               </div>
             );
           })}
@@ -173,18 +218,46 @@ function formatType(item: RoutineItem | undefined): string {
   return item.type === 'workout' ? 'ワークアウト' : 'インターバル';
 }
 
-function getActionMessage(
-  state: TimerState,
-  current: RoutineItem | undefined,
-  next: RoutineItem | undefined,
-): string {
-  if (state.status === 'idle') return '開始ボタンを押す';
-  if (state.status === 'countdown') return `${current?.title ?? '最初の種目'}の準備`;
-  if (state.status === 'paused') return '再開して予定を守る';
-  if (state.status === 'finished') return '完了。結果を確認する';
-  if (!current) return 'カードを追加する';
-  if (current.type === 'interval') return `${next?.title ?? '次の種目'}に備える`;
-  return `${current.title}を続ける`;
+function AdjacentWorkout({
+  direction,
+  item,
+  tone,
+  onClick,
+}: {
+  direction: 'previous' | 'next';
+  item: RoutineItem | undefined;
+  tone: ReturnType<typeof getTimerTone>;
+  onClick: () => void;
+}) {
+  const isPrevious = direction === 'previous';
+  const label = isPrevious ? '前へ' : '次へ';
+  const arrow = isPrevious ? '‹' : '›';
+  const labelGridClass = isPrevious ? 'grid-cols-[auto_auto]' : 'grid-cols-[auto_auto]';
+
+  return (
+    <button
+      className="grid min-h-22 place-items-center rounded-lg border-2 px-2 py-2 text-center shadow-sm shadow-[#d96a1f]/10 transition active:translate-y-px disabled:opacity-55"
+      onClick={onClick}
+      disabled={!item}
+      aria-label={`${isPrevious ? '前' : '次'}の種目へ移動`}
+      style={{
+        backgroundColor: tone.innerColor,
+        borderColor: tone.ringColor,
+        color: tone.ringColor,
+      }}
+    >
+      <span className="grid min-w-0 justify-items-center gap-1">
+        <span className={`grid items-center justify-center gap-1 ${labelGridClass}`}>
+          {isPrevious && <span className="text-2xl font-black leading-none">{arrow}</span>}
+          <span className="text-[0.72rem] font-black">{label}</span>
+          {!isPrevious && <span className="text-2xl font-black leading-none">{arrow}</span>}
+        </span>
+        <span className="block max-w-full truncate text-sm font-black leading-tight sm:text-base">
+          {item?.title ?? 'なし'}
+        </span>
+      </span>
+    </button>
+  );
 }
 
 function formatFinishedMessage(seconds: number): { prefix: string; delta: string; suffix: string } {
@@ -198,8 +271,7 @@ function formatFinishedMessage(seconds: number): { prefix: string; delta: string
   const absoluteSeconds = Math.abs(seconds);
   const minutes = Math.floor(absoluteSeconds / 60);
   const restSeconds = absoluteSeconds % 60;
-  const duration =
-    minutes > 0 ? `${minutes}分${restSeconds}秒` : `${restSeconds}秒`;
+  const duration = minutes > 0 ? `${minutes}分${restSeconds}秒` : `${restSeconds}秒`;
   return {
     prefix: '予定より',
     delta: duration,
@@ -262,7 +334,10 @@ function getTimerTone({ isFinished, isLate, isRest, isCountdown }: TimerToneInpu
   };
 }
 
-function getVisibleItems(items: RoutineItem[], currentIndex: number): Array<{ item: RoutineItem; index: number }> {
+function getVisibleItems(
+  items: RoutineItem[],
+  currentIndex: number
+): Array<{ item: RoutineItem; index: number }> {
   const start = Math.max(0, currentIndex - 1);
   const end = Math.min(items.length, currentIndex + 4);
   return items.slice(start, end).map((item, offset) => ({
