@@ -35,7 +35,7 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
     const targetDuration = getTargetDuration(routine);
     return targetDuration === null ? '' : String(Math.floor(targetDuration / 60));
   });
-  const [isSetFormOpen, setIsSetFormOpen] = useState(false);
+  const [isSetFormOpen, setIsSetFormOpen] = useState(true);
   const [setTitle, setSetTitle] = useState('ワークアウト');
   const [setWorkoutDurationSec, setSetWorkoutDurationSec] = useState('60');
   const [setIntervalDurationSec, setSetIntervalDurationSec] = useState('90');

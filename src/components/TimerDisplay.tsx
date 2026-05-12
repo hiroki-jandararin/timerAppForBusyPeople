@@ -50,24 +50,37 @@ export function TimerDisplay({
   return (
     <section className="my-4 grid content-center gap-3 rounded-lg border border-[#f1c29b] bg-[#fffdfa] p-4 py-5 text-center shadow-xl shadow-[#d96a1f]/10">
       {isFinished ? (
-        <div className={`grid gap-4 rounded-lg border p-4 text-center ${tone.panelClass}`}>
-          <div className="flex items-center justify-between gap-3 text-left">
-            <p className="m-0 rounded-lg bg-white/75 px-3 py-1 text-sm font-black">{tone.label}</p>
-            <p className="m-0 rounded-lg bg-white/75 px-3 py-1.5 text-lg font-black leading-none">
-              終了時刻　 {plannedEndLabel}
-            </p>
+        <>
+          <Confetti isLate={isLate} />
+          <div className={`celebrate-pop grid gap-4 rounded-lg border p-4 text-center ${tone.panelClass}`}>
+            <div className="flex items-center justify-between gap-3 text-left">
+              <p className="m-0 rounded-lg bg-white/75 px-3 py-1 text-sm font-black">{tone.label}</p>
+              <p className="m-0 rounded-lg bg-white/75 px-3 py-1.5 text-sm font-black leading-none">
+                終了時刻 {plannedEndLabel}
+              </p>
+            </div>
+            <div className="grid gap-3 rounded-lg bg-white/75 px-4 py-6">
+              <p
+                className="stamp-in m-0 text-[clamp(2.8rem,12vw,5rem)] font-black leading-none"
+                aria-label="トレーニング完了"
+              >
+                {isLate ? '完了！' : '完了！'}
+              </p>
+              <p className="m-0 text-[clamp(1rem,4vw,1.4rem)] font-black leading-snug">
+                {resultMessage.prefix}
+                {resultMessage.delta && (
+                  <span className="inline-block whitespace-nowrap font-black">
+                    {resultMessage.delta}
+                  </span>
+                )}
+                {resultMessage.suffix}
+              </p>
+              <p className="m-0 text-sm font-bold opacity-60">
+                {routine.items.filter((item) => item.type === 'workout').length}種目 お疲れ様でした
+              </p>
+            </div>
           </div>
-          <div className="grid min-h-60 content-center gap-3 rounded-lg bg-white/75 px-4 py-6">
-            <p className="m-0 text-sm font-black opacity-75">結果</p>
-            <p className="m-0 text-center text-[clamp(1.8rem,7vw,3.2rem)] font-black leading-[1.18]">
-              {resultMessage.prefix}
-              <span className="inline-block whitespace-nowrap text-[clamp(2.3rem,9vw,4.4rem)] leading-none">
-                {resultMessage.delta}
-              </span>
-              {resultMessage.suffix}
-            </p>
-          </div>
-        </div>
+        </>
       ) : (
         <div className={`grid gap-4 rounded-lg border p-4 text-left ${tone.panelClass}`}>
           <div className="flex items-center justify-between gap-3">
@@ -344,4 +357,60 @@ function getVisibleItems(
     item,
     index: start + offset,
   }));
+}
+
+const CONFETTI_PIECES: Array<{
+  x: number;
+  color: string;
+  w: number;
+  h: number;
+  delay: number;
+  dur: number;
+}> = [
+  { x: 3,  color: '#f26a21', w: 10, h: 6,  delay: 0,    dur: 2.6 },
+  { x: 10, color: '#ffd700', w: 8,  h: 8,  delay: 0.1,  dur: 2.9 },
+  { x: 18, color: '#e91e8c', w: 12, h: 5,  delay: 0.25, dur: 2.4 },
+  { x: 26, color: '#4caf50', w: 9,  h: 7,  delay: 0.05, dur: 3.0 },
+  { x: 33, color: '#f26a21', w: 7,  h: 9,  delay: 0.35, dur: 2.7 },
+  { x: 41, color: '#ffd700', w: 11, h: 6,  delay: 0.15, dur: 2.5 },
+  { x: 48, color: '#2196f3', w: 8,  h: 8,  delay: 0.4,  dur: 2.8 },
+  { x: 55, color: '#e91e8c', w: 10, h: 5,  delay: 0.08, dur: 3.1 },
+  { x: 62, color: '#4caf50', w: 9,  h: 7,  delay: 0.3,  dur: 2.6 },
+  { x: 70, color: '#f26a21', w: 12, h: 6,  delay: 0.2,  dur: 2.9 },
+  { x: 77, color: '#ffd700', w: 8,  h: 9,  delay: 0.45, dur: 2.4 },
+  { x: 84, color: '#2196f3', w: 10, h: 6,  delay: 0.12, dur: 2.7 },
+  { x: 91, color: '#e91e8c', w: 7,  h: 8,  delay: 0.28, dur: 3.0 },
+  { x: 97, color: '#4caf50', w: 11, h: 5,  delay: 0.18, dur: 2.5 },
+  { x: 7,  color: '#2196f3', w: 9,  h: 7,  delay: 0.5,  dur: 2.8 },
+  { x: 22, color: '#ffd700', w: 8,  h: 6,  delay: 0.38, dur: 2.6 },
+  { x: 37, color: '#f26a21', w: 10, h: 8,  delay: 0.22, dur: 3.2 },
+  { x: 52, color: '#4caf50', w: 7,  h: 7,  delay: 0.55, dur: 2.7 },
+  { x: 67, color: '#e91e8c', w: 11, h: 5,  delay: 0.32, dur: 2.9 },
+  { x: 82, color: '#ffd700', w: 9,  h: 9,  delay: 0.42, dur: 2.5 },
+];
+
+const CONFETTI_PIECES_MUTED: typeof CONFETTI_PIECES = CONFETTI_PIECES.map((p) => ({
+  ...p,
+  color: p.color + '99',
+}));
+
+function Confetti({ isLate }: { isLate: boolean }) {
+  const pieces = isLate ? CONFETTI_PIECES_MUTED : CONFETTI_PIECES;
+  return (
+    <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden" aria-hidden="true">
+      {pieces.map((piece, i) => (
+        <div
+          key={i}
+          className="absolute top-0 rounded-sm"
+          style={{
+            left: `${piece.x}%`,
+            width: piece.w,
+            height: piece.h,
+            backgroundColor: piece.color,
+            animation: `confetti-drop ${piece.dur}s ease-in ${piece.delay}s both`,
+          }}
+        />
+      ))}
+    </div>
+  );
 }
