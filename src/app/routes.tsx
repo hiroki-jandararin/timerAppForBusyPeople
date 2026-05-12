@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { createRoutine } from '../features/routines/routineFactory';
+import { createRoutineFromTemplate, type RoutineTemplate } from '../features/routines/routineTemplates';
 import { RoutineEditPage } from '../pages/RoutineEditPage';
 import { RoutineListPage } from '../pages/RoutineListPage';
+import { TemplateSelectPage } from '../pages/TemplateSelectPage';
 import { TimerPage } from '../pages/TimerPage';
 import type { Routine } from '../features/routines/routineTypes';
 import type { VoiceService } from '../features/voice/voiceService';
@@ -116,12 +119,25 @@ type NewRouteProps = {
 
 function NewRoute({ isLoaded, routines, onSave }: NewRouteProps) {
   const navigate = useNavigate();
+  const [selectedTemplate, setSelectedTemplate] = useState<RoutineTemplate | null | 'blank'>(null);
 
   if (!isLoaded) {
     return <LoadingPage />;
   }
 
-  const routine = createRoutine();
+  if (selectedTemplate === null) {
+    return (
+      <TemplateSelectPage
+        onSelect={(template) => setSelectedTemplate(template ?? 'blank')}
+        onBack={() => navigate('/')}
+      />
+    );
+  }
+
+  const routine =
+    selectedTemplate === 'blank'
+      ? createRoutine()
+      : createRoutineFromTemplate(selectedTemplate);
 
   return (
     <RoutineEditPage
@@ -131,7 +147,7 @@ function NewRoute({ isLoaded, routines, onSave }: NewRouteProps) {
         await onSave(nextRoutine);
         navigate('/');
       }}
-      onBack={() => navigate('/')}
+      onBack={() => setSelectedTemplate(null)}
     />
   );
 }
