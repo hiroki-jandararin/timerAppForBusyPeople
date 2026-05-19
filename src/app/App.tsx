@@ -120,8 +120,10 @@ function RoutineApp({ user, createRoutineRepository, onSignOut }: RoutineAppProp
 
 function LoadingPage() {
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-180 place-items-center p-4 text-[#241710] sm:p-5">
-      <p className="m-0 text-sm font-medium text-[#8a4b23]">読み込み中</p>
+    <main className="mx-auto grid min-h-screen w-full max-w-lg place-items-center p-4">
+      <p className="m-0 text-xs font-black tracking-[0.25em] uppercase text-[#A0A0A5]">
+        読み込み中...
+      </p>
     </main>
   );
 }

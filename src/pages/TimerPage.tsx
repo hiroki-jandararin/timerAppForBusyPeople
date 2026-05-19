@@ -45,12 +45,6 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
   const [isAdjustmentPromptOpen, setIsAdjustmentPromptOpen] = useState(false);
   const [hasShownAdjustmentPrompt, setHasShownAdjustmentPrompt] = useState(false);
   const stateRef = useRef<TimerState>(state);
-  const buttonBase =
-    'min-h-12 rounded-lg border px-3 font-bold shadow-sm transition active:translate-y-px';
-  const buttonClass = `${buttonBase} border-[#efc4a2] bg-[#fffdfa] text-[#241710]`;
-  const primaryButtonClass = `${buttonBase} border-[#d95f1a] bg-[#e95f1a] text-white shadow-[#f26a21]/20`;
-  const dangerButtonClass = `${buttonBase} border-[#c8332c] bg-[#fffdfa] text-[#c8332c]`;
-  const backLinkClass = 'border-0 bg-transparent p-0 text-sm font-bold text-[#8a4b23] shadow-none';
 
   function dispatch(action: TimerAction) {
     const previous = stateRef.current;
@@ -147,19 +141,37 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
     }
   }
 
+  const primaryBtn =
+    'min-h-16 w-full rounded-2xl bg-[#FF6B35] text-[#F5F5F5] text-xl font-black tracking-wide shadow-lg shadow-[#FF6B35]/20 transition active:scale-[0.97] disabled:opacity-50';
+  const pauseBtn =
+    'min-h-16 w-full rounded-2xl border border-[#3C3C42] bg-[#2C2C30] text-[#F5F5F5] text-xl font-black tracking-wide transition active:scale-[0.97]';
+  const stopBtn =
+    'min-h-14 w-full rounded-2xl border border-[#EF444440] text-[#EF4444] text-base font-bold tracking-wide transition active:scale-[0.97]';
+
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-180 grid-rows-[auto_auto_1fr_auto] p-4 text-[#241710] sm:p-5">
-      <header className="flex items-start justify-between gap-3 mb-3">
-        <button className={backLinkClass} onClick={onBack}>
+    <main className="mx-auto grid min-h-screen w-full max-w-lg grid-rows-[auto_auto_1fr_auto] gap-3 p-4 sm:p-5">
+      {/* Header */}
+      <header className="flex items-center justify-between gap-3">
+        <button
+          className="text-sm font-bold tracking-widest text-[#A0A0A5] uppercase transition hover:text-[#F5F5F5]"
+          onClick={onBack}
+        >
           ← 戻る
         </button>
-        <div className="rounded-full bg-[#f26a21] px-3 py-1.5 text-sm font-bold text-white">
+        <div
+          className="rounded-full px-3 py-1.5 text-sm font-bold text-[#F5F5F5]"
+          style={{ backgroundColor: '#FF6B3520', color: '#FF6B35' }}
+        >
           合計 {formatClockDuration(totalDuration)}
         </div>
       </header>
-      <p className="mb-3 rounded-lg border border-[#f5c198] bg-[#fff7ef] px-3 py-2 text-sm font-medium text-[#8a4b23]">
+
+      {/* Screen-on notice */}
+      <p className="m-0 rounded-xl border border-[#FFC10720] bg-[#FFC10710] px-3 py-2 text-center text-xs font-bold tracking-wide text-[#FFC107]">
         画面を開いたまま使用してください
       </p>
+
+      {/* Timer display */}
       <TimerDisplay
         routine={activeRoutine}
         state={state}
@@ -169,83 +181,92 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
         onPrevious={() => dispatch({ type: 'previous', routine: activeRoutine })}
         onNext={() => dispatch({ type: 'skip', routine: activeRoutine })}
         controls={
-          <div className="grid gap-3">
+          <div>
             {state.status === 'idle' || state.status === 'finished' ? (
               <button
-                className={`${primaryButtonClass} min-h-15 text-lg`}
+                className={primaryBtn}
                 onClick={() => dispatch({ type: 'start', routine: activeRoutine })}
               >
                 開始
               </button>
             ) : state.status === 'running' ? (
-              <button
-                className={`${primaryButtonClass} min-h-15 text-lg`}
-                onClick={() => dispatch({ type: 'pause' })}
-              >
+              <button className={pauseBtn} onClick={() => dispatch({ type: 'pause' })}>
                 一時停止
               </button>
             ) : state.status === 'countdown' ? (
-              <button className={`${primaryButtonClass} min-h-15 text-lg`} disabled>
+              <button className={primaryBtn} disabled>
                 カウントダウン
               </button>
             ) : (
-              <button
-                className={`${primaryButtonClass} min-h-15 text-lg`}
-                onClick={() => dispatch({ type: 'resume' })}
-              >
+              <button className={primaryBtn} onClick={() => dispatch({ type: 'resume' })}>
                 再開
               </button>
             )}
           </div>
         }
       />
-      <div className="grid gap-2">
-        <button className={dangerButtonClass} onClick={() => dispatch({ type: 'finish' })}>
+
+      {/* Stop button */}
+      <div className="pb-2">
+        <button className={stopBtn} onClick={() => dispatch({ type: 'finish' })}>
           終了
         </button>
       </div>
+
+      {/* Adjustment dialog */}
       {isAdjustmentPromptOpen && (
         <div
-          className="fixed inset-0 z-50 grid place-items-center bg-[#241710]/45 p-4"
+          className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="adjustment-suggestion-title"
         >
-          <section className="grid w-full max-w-105 gap-4 rounded-lg border border-[#f0b3a2] bg-[#fffdfa] p-4 text-left text-[#241710] shadow-2xl">
-            <div className="grid gap-1">
-              <p className="m-0 text-sm font-black text-[#9c211b]">
+          <section className="grid w-full max-w-sm gap-4 rounded-2xl border border-[#3C3C42] bg-[#1E1E21] p-5 shadow-2xl shadow-black/80">
+            <div className="grid gap-1.5">
+              <p className="m-0 text-xs font-black tracking-[0.15em] uppercase text-[#EF4444]">
                 {formatScheduleDifference(timing.deltaSec)}
               </p>
-              <h2 id="adjustment-suggestion-title" className="m-0 text-xl font-black leading-tight">
+              <h2
+                id="adjustment-suggestion-title"
+                className="m-0 text-xl font-black leading-tight text-[#F5F5F5]"
+              >
                 この先の休憩を短縮しますか？
               </h2>
-              <p className="m-0 text-sm font-bold text-[#6d5a4d]">
+              <p className="m-0 text-sm font-bold text-[#A0A0A5]">
                 種目は残したまま、休憩を合計{restShorteningPlan.recoveredSec}秒短縮できます。
               </p>
             </div>
-            <article className="rounded-lg border border-[#ead8c7] bg-[#fff7ef] p-3">
-              <h3 className="m-0 text-base font-black">休憩短縮</h3>
-              <p className="m-0 mt-1 text-sm font-bold text-[#6d5a4d]">
+
+            <div className="rounded-xl border border-[#3C3C42] bg-[#2C2C30] p-3">
+              <h3 className="m-0 text-sm font-black tracking-wide text-[#F5F5F5]">休憩短縮</h3>
+              <p className="m-0 mt-1 text-xs font-bold text-[#A0A0A5]">
                 この先の休憩{restShorteningPlan.changedCount}件を同じ割合で短くします。
               </p>
-              <div className="mt-3 grid gap-2">
+              <div className="mt-3 grid gap-1.5">
                 {restShorteningPlan.changes.map((change, index) => (
                   <div
                     key={`${change.title}-${index}`}
-                    className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-lg bg-white/75 px-3 py-2 text-sm"
+                    className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-xl bg-[#1E1E21] px-3 py-2 text-sm"
                   >
-                    <span className="font-bold text-[#4b392e]">{change.title}</span>
-                    <span className="font-black text-[#9c211b]">
+                    <span className="font-bold text-[#D0D0D5]">{change.title}</span>
+                    <span className="font-black text-[#FF6B35]">
                       {change.beforeSec}秒 → {change.afterSec}秒（-{change.shortenedSec}秒）
                     </span>
                   </div>
                 ))}
               </div>
-            </article>
-            <button className={`${primaryButtonClass} min-h-12`} onClick={applyRestShortening}>
+            </div>
+
+            <button
+              className="min-h-14 w-full rounded-2xl bg-[#FF6B35] text-lg font-black text-[#F5F5F5] shadow-lg shadow-[#FF6B35]/20 transition active:scale-[0.97]"
+              onClick={applyRestShortening}
+            >
               休憩を短縮する
             </button>
-            <button className={buttonClass} onClick={() => setIsAdjustmentPromptOpen(false)}>
+            <button
+              className="min-h-12 w-full rounded-2xl border border-[#3C3C42] bg-[#2C2C30] font-bold text-[#A0A0A5] transition active:scale-[0.97]"
+              onClick={() => setIsAdjustmentPromptOpen(false)}
+            >
               今回はしない
             </button>
           </section>
@@ -301,12 +322,7 @@ function createRestShorteningPlan(
   const targetRecoverSec = Math.min(requiredSec, maxRecoverableSec);
 
   if (totalRestSec <= 0 || targetRecoverSec <= 0) {
-    return {
-      routine,
-      recoveredSec: 0,
-      changedCount: 0,
-      changes: [],
-    };
+    return { routine, recoveredSec: 0, changedCount: 0, changes: [] };
   }
 
   const reductionRatio = targetRecoverSec / totalRestSec;
@@ -342,10 +358,7 @@ function createRestShorteningPlan(
   const items = routine.items.map((item, index) => {
     const shortenSec = shortenByIndex.get(index) ?? 0;
     if (shortenSec <= 0) return item;
-    return {
-      ...item,
-      durationSec: item.durationSec - shortenSec,
-    };
+    return { ...item, durationSec: item.durationSec - shortenSec };
   });
   const changes = shortenPlans
     .filter((plan) => plan.shortenSec > 0)

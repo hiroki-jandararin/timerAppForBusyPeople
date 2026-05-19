@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import {
-  calculateTargetDifference,
   calculateTotalDuration,
   formatClockDuration,
-  formatSignedDifference,
-  getTargetDuration,
 } from '../features/routines/routineTime';
 import type { Routine } from '../features/routines/routineTypes';
 
@@ -19,66 +16,120 @@ type Props = {
 export function RoutineCard({ routine, onStart, onEdit, onDuplicate, onDelete }: Props) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const total = calculateTotalDuration(routine);
-  const targetDuration = getTargetDuration(routine);
-  const targetDifference = calculateTargetDifference(routine);
-  const buttonBase = 'rounded-lg border font-bold transition active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50';
-  const primaryButton = `${buttonBase} min-h-[58px] border-[#e45112] bg-[#e95f1a] px-4 text-lg text-white shadow-sm shadow-[#f26a21]/15`;
-  const menuButton = `${buttonBase} min-h-10 border-[#efc4a2] bg-[#fffdfa] px-3 text-[#6d5a4d] shadow-sm`;
-  const editButton = `${buttonBase} min-h-10 border-[#efc4a2] bg-[#fffdfa] px-3 text-sm text-[#241710] shadow-sm`;
-  const duplicateButton = `${buttonBase} min-h-10 border-[#efc4a2] bg-[#fffdfa] px-3 text-sm text-[#6d5a4d]`;
-  const dangerButton = `${buttonBase} min-h-10 border-[#e7b6b3] bg-[#fff7f6] px-3 text-sm text-[#a83a34]`;
+  const workoutCount = routine.items.filter((i) => i.type === 'workout').length;
+
   return (
-    <article className="overflow-hidden rounded-lg border border-[#f4d0b3] bg-[#fffdfa] shadow-sm shadow-[#d96a1f]/5">
-      <div className="h-1 bg-[#f26a21]" />
+    <article
+      className="overflow-hidden rounded-2xl border border-[#2C2C30] shadow-xl shadow-black/50"
+      style={{ background: 'linear-gradient(160deg, #28282C 0%, #1E1E21 100%)' }}
+    >
+      {/* Top accent — fades right */}
+      <div
+        className="h-0.75"
+        style={{ background: 'linear-gradient(90deg, #FF6B35 0%, #FFA94D 45%, transparent 100%)' }}
+      />
+
       <div className="p-4">
-        <div className="mb-3 grid grid-cols-[1fr_auto] items-start gap-2">
-          <h2 className="m-0 min-w-0 text-xl font-black leading-tight">{routine.name}</h2>
+        {/* Title row */}
+        <div className="mb-4 flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="mb-1 flex items-center gap-2">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#FF6B35]" />
+              <span className="text-[0.58rem] font-black tracking-[0.22em] uppercase text-[#A0A0A5]">
+                {workoutCount}種目
+              </span>
+            </div>
+            <h2 className="m-0 min-w-0 truncate text-xl font-black leading-tight text-[#F5F5F5]">
+              {routine.name}
+            </h2>
+          </div>
           <button
             type="button"
-            className={`${menuButton} w-10 px-0`}
-            onClick={() => setIsMenuOpen((current) => !current)}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#3C3C42] bg-[#1A1A1D] text-lg text-[#A0A0A5] transition active:scale-[0.93]"
+            onClick={() => setIsMenuOpen((c) => !c)}
             aria-label="ルーティン操作メニュー"
             aria-expanded={isMenuOpen}
           >
-            …
+            ···
           </button>
         </div>
-        <div className="mb-3 grid gap-2 rounded-lg border border-[#f5a568] bg-[#fff0df] p-3 shadow-sm shadow-[#f26a21]/10">
-          <div className="flex items-end justify-between gap-3">
-            <span className="text-sm font-bold text-[#8a4b23]">予定時間</span>
-            <span className="text-3xl font-black leading-none text-[#b84b12]">
-              {formatClockDuration(total)}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-sm font-bold">
-            <div className="rounded-lg bg-[#fffdfa] px-3 py-2 text-[#6d5a4d]">
-              目標 {targetDuration === null ? '未設定' : formatClockDuration(targetDuration)}
+
+        {/* Hero time box */}
+        <div className="relative mb-3 overflow-hidden rounded-2xl border border-[#2C2C30]">
+          {/* Ambient glow */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(ellipse at 75% 50%, #FF6B3520 0%, transparent 65%)',
+            }}
+          />
+
+          <div className="relative flex items-end justify-between px-4 pt-4 pb-3">
+            <div>
+              <p className="m-0 text-[0.58rem] font-black tracking-[0.22em] uppercase text-[#A0A0A5]">
+                予定時間
+              </p>
+              <p
+                className="m-0 font-bebas text-[3.2rem] leading-none tracking-wide text-[#FF6B35]"
+                style={{ textShadow: '0 0 24px #FF6B3548' }}
+              >
+                {formatClockDuration(total)}
+              </p>
             </div>
-            <div
-              className={`rounded-lg px-3 py-2 ${
-                targetDifference === null || targetDifference >= 0
-                  ? 'bg-[#eef8ef] text-[#2d6b2c]'
-                  : 'bg-[#fff0ee] text-[#9c211b]'
-              }`}
+            <div className="mb-1 text-right">
+              <p
+                className="m-0 font-bebas text-3xl leading-none"
+                style={{ color: '#3C3C42' }}
+              >
+                {routine.items.length}
+              </p>
+              <p className="m-0 text-[0.55rem] font-black tracking-[0.18em] uppercase text-[#505058]">
+                ITEMS
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Start button */}
+        <button
+          className="min-h-14 w-full rounded-2xl text-lg font-black text-[#F5F5F5] transition active:scale-[0.97] disabled:opacity-40"
+          style={{
+            background: 'linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%)',
+            boxShadow: '0 4px 24px #FF6B3530',
+          }}
+          onClick={onStart}
+          disabled={routine.items.length === 0}
+        >
+          開始
+        </button>
+
+        {/* Menu items */}
+        {isMenuOpen && (
+          <div className="mt-2 grid gap-2 border-t border-[#2C2C30] pt-2">
+            <button
+              className="min-h-10 rounded-xl border border-[#3C3C42] bg-[#1A1A1D] font-bold text-[#F5F5F5] transition active:scale-[0.97]"
+              onClick={onEdit}
             >
-              {targetDifference === null ? '差分 未設定' : formatSignedDifference(targetDifference)}
+              編集
+            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                className="min-h-10 rounded-xl border border-[#3C3C42] bg-[#1A1A1D] text-sm font-bold text-[#A0A0A5] transition active:scale-[0.97]"
+                onClick={onDuplicate}
+              >
+                複製
+              </button>
+              <button
+                className="min-h-10 rounded-xl border border-[#EF444430] bg-[#EF444408] text-sm font-bold text-[#EF4444] transition active:scale-[0.97]"
+                onClick={onDelete}
+              >
+                削除
+              </button>
             </div>
           </div>
-        </div>
-        <div className="mt-3 grid gap-2">
-          <button className={primaryButton} onClick={onStart} disabled={routine.items.length === 0}>
-            開始
-          </button>
-          {isMenuOpen && (
-            <div className="grid gap-2 border-t border-[#f1e1d4] pt-2">
-              <button className={editButton} onClick={onEdit}>編集</button>
-              <div className="grid grid-cols-2 gap-2">
-                <button className={duplicateButton} onClick={onDuplicate}>複製</button>
-                <button className={dangerButton} onClick={onDelete}>削除</button>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </article>
   );
