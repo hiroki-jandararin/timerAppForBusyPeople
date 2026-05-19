@@ -130,12 +130,11 @@ export function TimerDisplay({
                   {isRest ? '休憩終了まで' : isCountdown ? '開始まで' : '残り'}
                 </p>
                 <p
-                  className="m-0 text-[clamp(5.6rem,30vw,10rem)] font-black leading-[0.9]"
-                  aria-label={isRest ? '休憩終了までの残り秒数' : '残り秒数'}
+                  className="m-0 text-[clamp(3rem,15vw,5.5rem)] font-black leading-[0.9] tabular-nums"
+                  aria-label={isRest ? '休憩終了までの残り時間' : '残り時間'}
                 >
-                  {displayRemainingSec}
+                  {formatCountdown(displayRemainingSec)}
                 </p>
-                <p className="m-0 text-sm font-black opacity-80">秒</p>
               </div>
             </div>
             <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,2.2fr)_minmax(0,1fr)] items-stretch gap-2 rounded-lg bg-white/75 px-2 py-2 text-center sm:px-3">
@@ -271,6 +270,12 @@ function AdjacentWorkout({
       </span>
     </button>
   );
+}
+
+function formatCountdown(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function formatFinishedMessage(seconds: number): { prefix: string; delta: string; suffix: string } {

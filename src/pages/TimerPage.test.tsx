@@ -45,7 +45,7 @@ describe('TimerPage', () => {
     render(<TimerPage routine={createTimerRoutine()} voiceService={new MockVoiceService()} wakeLockService={wakeLockService} onBack={vi.fn()} />);
 
     expect(screen.getAllByText('スクワット')).not.toHaveLength(0);
-    expect(screen.getByLabelText('残り秒数')).toHaveTextContent('30');
+    expect(screen.getByLabelText('残り時間')).toHaveTextContent('0:30');
     expect(screen.getByText(/終了予定時刻/)).toBeInTheDocument();
     expect(screen.getByText('次へ')).toBeInTheDocument();
     expect(screen.getByText('開始前')).toBeInTheDocument();
@@ -58,7 +58,7 @@ describe('TimerPage', () => {
 
     await user.click(screen.getByRole('button', { name: '開始' }));
     expect(screen.getByText('開始まで')).toBeInTheDocument();
-    expect(screen.getByLabelText('残り秒数')).toHaveTextContent('3');
+    expect(screen.getByLabelText('残り時間')).toHaveTextContent('0:03');
   });
 
   it('開始直後はカウントダウン中の表示に変わる', async () => {
@@ -101,7 +101,7 @@ describe('TimerPage', () => {
       });
       fireEvent.click(screen.getByRole('button', { name: '次の種目へ移動' }));
 
-      expect(screen.getByLabelText('休憩終了までの残り秒数')).toHaveTextContent('20');
+      expect(screen.getByLabelText('休憩終了までの残り時間')).toHaveTextContent('0:20');
       expect(screen.queryByText('休憩終了まで 20秒')).not.toBeInTheDocument();
       expect(screen.getByText('30秒早い')).toBeInTheDocument();
       expect(screen.getAllByText('腕立て伏せ')).not.toHaveLength(0);
@@ -140,12 +140,12 @@ describe('TimerPage', () => {
       fireEvent.click(screen.getByRole('button', { name: '次の種目へ移動' }));
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(screen.getByLabelText('休憩終了までの残り秒数')).toHaveTextContent('45');
+      expect(screen.getByLabelText('休憩終了までの残り時間')).toHaveTextContent('0:45');
 
       fireEvent.click(screen.getByRole('button', { name: '次の種目へ移動' }));
       fireEvent.click(screen.getByRole('button', { name: '次の種目へ移動' }));
 
-      expect(screen.getByLabelText('休憩終了までの残り秒数')).toHaveTextContent('15');
+      expect(screen.getByLabelText('休憩終了までの残り時間')).toHaveTextContent('0:15');
     } finally {
       vi.useRealTimers();
     }
