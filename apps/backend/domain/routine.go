@@ -1,12 +1,14 @@
 package domain
 
+import "time"
+
 type Routine struct {
-	ID         string    `json:"id"`
-	Name 	   string `json:"name"`
-	TargetDurationSec *int  `json:"targetDurationSec,omitempty"`
-	Items	   []RoutineItem `json:"items"`
-	CreatedAt   string `json:"createdAt"`
-	UpdatedAt   string `json:"updatedAt"`
+	ID                string        `json:"id"`
+	Name              string        `json:"name"`
+	TargetDurationSec *int          `json:"targetDurationSec,omitempty"`
+	Items             []RoutineItem `json:"items"`
+	CreatedAt         time.Time     `json:"createdAt"`
+	UpdatedAt         time.Time     `json:"updatedAt"`
 }
 
 type RoutineItem struct {

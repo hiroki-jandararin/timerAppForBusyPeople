@@ -43,7 +43,7 @@ func TestGetRoutines(t *testing.T) {
 			routines: []domain.Routine{
 				{ID: "2", Name: "ストレッチ", TargetDurationSec: nil, Items: []domain.RoutineItem{}},
 			},
-			expectedJSON: `[{"id":"2","name":"ストレッチ","items":[],"createdAt":"","updatedAt":""}]`,
+			expectedJSON: `[{"id":"2","name":"ストレッチ","items":[],"createdAt":"0001-01-01T00:00:00Z","updatedAt":"0001-01-01T00:00:00Z"}]`,
 		},
 		{
 			name: "targetDurationSecあり・workout/interval両方・voiceTextあり/なし",
@@ -58,7 +58,7 @@ func TestGetRoutines(t *testing.T) {
 					},
 				},
 			},
-			expectedJSON: `[{"id":"1","name":"朝トレ","targetDurationSec":300,"items":[{"id":"i1","type":"workout","title":"スクワット","durationSec":30},{"id":"i2","type":"interval","title":"休憩","durationSec":10,"voiceText":"次はプランクです"}],"createdAt":"","updatedAt":""}]`,
+			expectedJSON: `[{"id":"1","name":"朝トレ","targetDurationSec":300,"items":[{"id":"i1","type":"workout","title":"スクワット","durationSec":30},{"id":"i2","type":"interval","title":"休憩","durationSec":10,"voiceText":"次はプランクです"}],"createdAt":"0001-01-01T00:00:00Z","updatedAt":"0001-01-01T00:00:00Z"}]`,
 		},
 		{
 			name: "複数のルーティンを全件返す",
@@ -66,7 +66,7 @@ func TestGetRoutines(t *testing.T) {
 				{ID: "1", Name: "朝トレ", Items: []domain.RoutineItem{}},
 				{ID: "2", Name: "ストレッチ", Items: []domain.RoutineItem{}},
 			},
-			expectedJSON: `[{"id":"1","name":"朝トレ","items":[],"createdAt":"","updatedAt":""},{"id":"2","name":"ストレッチ","items":[],"createdAt":"","updatedAt":""}]`,
+			expectedJSON: `[{"id":"1","name":"朝トレ","items":[],"createdAt":"0001-01-01T00:00:00Z","updatedAt":"0001-01-01T00:00:00Z"},{"id":"2","name":"ストレッチ","items":[],"createdAt":"0001-01-01T00:00:00Z","updatedAt":"0001-01-01T00:00:00Z"}]`,
 		},
 	}
 
@@ -95,5 +95,5 @@ func TestGetRoutineByID(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
-	assert.JSONEq(t, `{"id":"1","name":"朝トレ","items":[],"createdAt":"","updatedAt":""}`, rr.Body.String())
+	assert.JSONEq(t, `{"id":"1","name":"朝トレ","items":[],"createdAt":"0001-01-01T00:00:00Z","updatedAt":"0001-01-01T00:00:00Z"}`, rr.Body.String())
 }

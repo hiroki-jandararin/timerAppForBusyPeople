@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/hiroki-jandararin/apps/backend/domain"
 	"github.com/hiroki-jandararin/apps/backend/repository"
@@ -107,7 +108,7 @@ func TestFindByID(t *testing.T) {
 				_, err := tx.Exec(`INSERT INTO routines (id, user_id, name, items, created_at, updated_at) VALUES ('1', '97649158-71e1-4fdd-b749-963937ac57fe', '朝トレ', '[]', '2024-01-01 00:00:00+00', '2024-01-01 12:00:00+00')`)
 				require.NoError(t, err)
 			},
-			expected: &domain.Routine{ID: "1", Name: "朝トレ", Items: []domain.RoutineItem{}, CreatedAt: "2024-01-01T00:00:00Z", UpdatedAt: "2024-01-01T12:00:00Z"},
+			expected: &domain.Routine{ID: "1", Name: "朝トレ", Items: []domain.RoutineItem{}, CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), UpdatedAt: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)},
 		},
 	}
 
