@@ -46,3 +46,7 @@ func (r *postgresRoutineRepository) FindAll(userID string) ([]domain.Routine, er
 	}
 	return routines, nil
 }
+
+func (r *postgresRoutineRepository) FindByID(id string) (*domain.Routine, error) {
+	return nil, nil
+}

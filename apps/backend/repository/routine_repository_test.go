@@ -89,3 +89,7 @@ func TestFindAll_DBError(t *testing.T) {
 
 	assert.Error(t, err)
 }
+
+func TestFindByID(t *testing.T) {
+
+}

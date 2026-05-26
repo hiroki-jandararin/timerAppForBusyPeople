@@ -13,10 +13,15 @@ import (
 // モック: FindAll が固定データを返す
 type mockRoutineRepository struct {
 	routines []domain.Routine
+	routine  *domain.Routine
 }
 
 func (m *mockRoutineRepository) FindAll(userID string) ([]domain.Routine, error) {
 	return m.routines, nil
+}
+
+func (m *mockRoutineRepository) FindByID(id string) (*domain.Routine, error) {
+	return m.routine, nil
 }
 
 func intPtr(v int) *int       { return &v }
@@ -78,4 +83,17 @@ func TestGetRoutines(t *testing.T) {
 			assert.JSONEq(t, tt.expectedJSON, rr.Body.String())
 		})
 	}
+}
+
+func TestGetRoutineByID(t *testing.T) {
+	req := httptest.NewRequest("GET", "/routines/1", nil)
+	rr := httptest.NewRecorder()
+
+	expectedRoutine := &domain.Routine{ID: "1", Name: "朝トレ", Items: []domain.RoutineItem{}}
+	h := handler.NewRoutineHandler(&mockRoutineRepository{routine: expectedRoutine})
+	h.GetRoutineByID(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+	assert.JSONEq(t, `{"id":"1","name":"朝トレ","items":[],"createdAt":"","updatedAt":""}`, rr.Body.String())
 }
