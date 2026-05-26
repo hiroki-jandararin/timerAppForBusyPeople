@@ -29,7 +29,7 @@ func (h *RoutineHandler) GetRoutines(w http.ResponseWriter, r *http.Request) {
 
 func (h *RoutineHandler) GetRoutineByID(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	// TODO: ルーティンIDをURLパラメータから取得　認証実装後
+	// TODO: ルーティンIDをURLパラメータから取得　認証実装後修正
 	routineID := r.URL.Query().Get("id")
 	routine, err := h.repo.FindByID(routineID)
 	if err != nil {

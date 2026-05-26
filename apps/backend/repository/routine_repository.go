@@ -11,6 +11,7 @@ import (
 // *sql.DB と *sql.Tx の両方を受け取れるインターフェース
 type dbExecutor interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 type postgresRoutineRepository struct {
@@ -48,5 +49,19 @@ func (r *postgresRoutineRepository) FindAll(userID string) ([]domain.Routine, er
 }
 
 func (r *postgresRoutineRepository) FindByID(id string) (*domain.Routine, error) {
-	return nil, nil
+	query := `SELECT id, name, target_duration_sec, items, created_at, updated_at FROM routines WHERE id = $1`
+	row := r.db.QueryRowContext(context.Background(), query, id)
+
+	var routine domain.Routine
+	var itemsJSON []byte
+	if err := row.Scan(&routine.ID, &routine.Name, &routine.TargetDurationSec, &itemsJSON, &routine.CreatedAt, &routine.UpdatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // 見つからない場合は nil を返す
+		}
+		return nil, err
+	}
+	if err := json.Unmarshal(itemsJSON, &routine.Items); err != nil {
+		return nil, err
+	}
+	return &routine, nil
 }
