@@ -15,7 +15,7 @@ type mockRoutineRepository struct {
 	routines []domain.Routine
 }
 
-func (m *mockRoutineRepository) FindAll() ([]domain.Routine, error) {
+func (m *mockRoutineRepository) FindAll(userID string) ([]domain.Routine, error) {
 	return m.routines, nil
 }
 

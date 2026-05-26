@@ -1,5 +1,5 @@
 package domain
 
 type RoutineRepository interface {
-	FindAll() ([]Routine, error)
+	FindAll(userID string) ([]Routine, error)
 }

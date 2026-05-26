@@ -30,18 +30,19 @@ func setupDB(t *testing.T) *sql.Tx {
 func TestFindAll(t *testing.T) {
 	tests := []struct {
 		name     string
-		seed     func(tx *sql.Tx) // テストデータを INSERT する関数
+		seed     func(t *testing.T, tx *sql.Tx)
 		expected []domain.Routine
 	}{
 		{
 			name:     "データが0件のとき空配列を返す",
-			seed:     func(tx *sql.Tx) {},
+			seed:     func(t *testing.T, tx *sql.Tx) {},
 			expected: []domain.Routine{},
 		},
 		{
 			name: "データが1件のとき1件返す",
-			seed: func(tx *sql.Tx) {
-				tx.Exec(`INSERT INTO routines (id, user_id, name, items) VALUES ('1', 'user1', '朝トレ', '[]')`)
+			seed: func(t *testing.T, tx *sql.Tx) {
+				_, err := tx.Exec(`INSERT INTO routines (id, user_id, name, items, created_at, updated_at) VALUES ('1', '97649158-71e1-4fdd-b749-963937ac57fe', '朝トレ', '[]', NOW(), NOW())`)
+				require.NoError(t, err)
 			},
 			expected: []domain.Routine{
 				{ID: "1", Name: "朝トレ", Items: []domain.RoutineItem{}},
@@ -49,9 +50,11 @@ func TestFindAll(t *testing.T) {
 		},
 		{
 			name: "データが複数件のとき全件返す",
-			seed: func(tx *sql.Tx) {
-				tx.Exec(`INSERT INTO routines (id, user_id, name, items) VALUES ('1', 'user1', '朝トレ', '[]')`)
-				tx.Exec(`INSERT INTO routines (id, user_id, name, items) VALUES ('2', 'user1', '夜トレ', '[]')`)
+			seed: func(t *testing.T, tx *sql.Tx) {
+				_, err := tx.Exec(`INSERT INTO routines (id, user_id, name, items, created_at, updated_at) VALUES ('1', '97649158-71e1-4fdd-b749-963937ac57fe', '朝トレ', '[]', NOW(), NOW())`)
+				require.NoError(t, err)
+				_, err = tx.Exec(`INSERT INTO routines (id, user_id, name, items, created_at, updated_at) VALUES ('2', '97649158-71e1-4fdd-b749-963937ac57fe', '夜トレ', '[]', NOW(), NOW())`)
+				require.NoError(t, err)
 			},
 			expected: []domain.Routine{
 				{ID: "1", Name: "朝トレ", Items: []domain.RoutineItem{}},
@@ -63,10 +66,10 @@ func TestFindAll(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tx := setupDB(t)
-			tt.seed(tx)
+			tt.seed(t, tx)
 
 			repo := repository.NewPostgresRoutineRepository(tx)
-			routines, err := repo.FindAll()
+			routines, err := repo.FindAll("97649158-71e1-4fdd-b749-963937ac57fe")
 
 			assert.NoError(t, err)
 			assert.Len(t, routines, len(tt.expected))
@@ -82,7 +85,7 @@ func TestFindAll_DBError(t *testing.T) {
 	db.Close() // 接続を閉じてエラーを再現
 
 	repo := repository.NewPostgresRoutineRepository(db)
-	_, err = repo.FindAll()
+	_, err = repo.FindAll("97649158-71e1-4fdd-b749-963937ac57fe")
 
 	assert.Error(t, err)
 }
