@@ -59,6 +59,15 @@ func (h *RoutineHandler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(createdRoutine)
 }
 
+func (h *RoutineHandler) DeleteRoutine(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := h.repo.Delete(id); err != nil {
+		http.Error(w, "Failed to delete routine", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *RoutineHandler) UpdateRoutine(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var routine domain.Routine

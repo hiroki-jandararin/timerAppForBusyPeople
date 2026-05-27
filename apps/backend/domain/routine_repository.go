@@ -5,4 +5,5 @@ type RoutineRepository interface {
 	FindByID(id string) (*Routine, error)
 	Create(routine *Routine) (*Routine, error)
 	Update(routine *Routine) (*Routine, error)
+	Delete(id string) error
 }

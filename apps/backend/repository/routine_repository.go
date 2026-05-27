@@ -12,6 +12,7 @@ import (
 type dbExecutor interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
 type postgresRoutineRepository struct {
@@ -64,6 +65,12 @@ func (r *postgresRoutineRepository) FindByID(id string) (*domain.Routine, error)
 		return nil, err
 	}
 	return &routine, nil
+}
+
+func (r *postgresRoutineRepository) Delete(id string) error {
+	query := `DELETE FROM routines WHERE id = $1`
+	_, err := r.db.ExecContext(context.Background(), query, id)
+	return err
 }
 
 func (r *postgresRoutineRepository) Update(routine *domain.Routine) (*domain.Routine, error) {

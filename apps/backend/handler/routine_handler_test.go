@@ -33,6 +33,10 @@ func (m *mockRoutineRepository) Update(routine *domain.Routine) (*domain.Routine
 	return m.routine, nil
 }
 
+func (m *mockRoutineRepository) Delete(id string) error {
+	return nil
+}
+
 func intPtr(v int) *int       { return &v }
 func strPtr(v string) *string { return &v }
 
@@ -105,6 +109,16 @@ func TestGetRoutineByID(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
 	assert.JSONEq(t, `{"id":"1","name":"朝トレ","items":[],"createdAt":"0001-01-01T00:00:00Z","updatedAt":"0001-01-01T00:00:00Z"}`, rr.Body.String())
+}
+
+func TestDeleteRoutine(t *testing.T) {
+	req := httptest.NewRequest("DELETE", "/routines/1", nil)
+	rr := httptest.NewRecorder()
+
+	h := handler.NewRoutineHandler(&mockRoutineRepository{})
+	h.DeleteRoutine(rr, req)
+
+	assert.Equal(t, http.StatusNoContent, rr.Code)
 }
 
 func TestUpdateRoutine(t *testing.T) {

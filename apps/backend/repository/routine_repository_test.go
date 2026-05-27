@@ -153,6 +153,35 @@ func TestUpdate(t *testing.T) {
 	assert.False(t, updated.UpdatedAt.IsZero())
 }
 
+func TestDelete(t *testing.T) {
+	tx := setupDB(t)
+	_, err := tx.Exec(`INSERT INTO routines (id, user_id, name, items, created_at, updated_at) VALUES ('1', '97649158-71e1-4fdd-b749-963937ac57fe', '朝トレ', '[]', '2024-01-01 00:00:00+00', '2024-01-01 12:00:00+00')`)
+	require.NoError(t, err)
+
+	repo := repository.NewPostgresRoutineRepository(tx)
+	err = repo.Delete("1")
+
+	assert.NoError(t, err)
+
+	// 削除後は取得できないことを確認
+	routine, err := repo.FindByID("1")
+	assert.NoError(t, err)
+	assert.Nil(t, routine)
+}
+
+func TestDelete_DBError(t *testing.T) {
+	godotenv.Load("../.env")
+
+	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+	require.NoError(t, err)
+	db.Close()
+
+	repo := repository.NewPostgresRoutineRepository(db)
+	err = repo.Delete("1")
+
+	assert.Error(t, err)
+}
+
 func TestUpdate_DBError(t *testing.T) {
 	godotenv.Load("../.env")
 

@@ -28,5 +28,6 @@ func main() {
 	http.HandleFunc("GET /routines/{id}", h.GetRoutineByID)
 	http.HandleFunc("POST /routines", h.CreateRoutine)
 	http.HandleFunc("PUT /routines/{id}", h.UpdateRoutine)
+	http.HandleFunc("DELETE /routines/{id}", h.DeleteRoutine)
 	http.ListenAndServe(":8080", nil)
 }
