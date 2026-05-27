@@ -31,7 +31,7 @@ func (r *postgresRoutineRepository) FindAll(userID string) ([]domain.Routine, er
 	}
 	defer rows.Close()
 
-	var routines []domain.Routine
+	routines := []domain.Routine{}
 	for rows.Next() {
 		var routine domain.Routine
 		var itemsJSON []byte
