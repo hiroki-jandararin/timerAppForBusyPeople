@@ -73,26 +73,36 @@ func (r *postgresRoutineRepository) Delete(id string) error {
 	return err
 }
 
-func (r *postgresRoutineRepository) Update(routine *domain.Routine) (*domain.Routine, error) {
+func (r *postgresRoutineRepository) Update(userID string, routine *domain.Routine) (*domain.Routine, error) {
 	itemsJSON, err := json.Marshal(routine.Items)
 	if err != nil {
 		return nil, err
 	}
-	query := `UPDATE routines SET name = $1, target_duration_sec = $2, items = $3, updated_at = NOW() WHERE id = $4 RETURNING updated_at`
-	err = r.db.QueryRowContext(context.Background(), query, routine.Name, routine.TargetDurationSec, itemsJSON, routine.ID).Scan(&routine.UpdatedAt)
+	query := `
+		INSERT INTO routines (id, user_id, name, target_duration_sec, items, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+		ON CONFLICT (id) DO UPDATE SET
+			name = EXCLUDED.name,
+			target_duration_sec = EXCLUDED.target_duration_sec,
+			items = EXCLUDED.items,
+			updated_at = NOW()
+		RETURNING created_at, updated_at`
+	err = r.db.QueryRowContext(context.Background(), query,
+		routine.ID, userID, routine.Name, routine.TargetDurationSec, itemsJSON,
+	).Scan(&routine.CreatedAt, &routine.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
 	return routine, nil
 }
 
-func (r *postgresRoutineRepository) Create(routine *domain.Routine) (*domain.Routine, error) {
+func (r *postgresRoutineRepository) Create(userID string, routine *domain.Routine) (*domain.Routine, error) {
 	itemsJSON, err := json.Marshal(routine.Items)
 	if err != nil {
 		return nil, err
 	}
-	query := `INSERT INTO routines (id, name, target_duration_sec, items, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING created_at, updated_at`
-	err = r.db.QueryRowContext(context.Background(), query, routine.ID, routine.Name, routine.TargetDurationSec, itemsJSON).Scan(&routine.CreatedAt, &routine.UpdatedAt)
+	query := `INSERT INTO routines (id, user_id, name, target_duration_sec, items, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING created_at, updated_at`
+	err = r.db.QueryRowContext(context.Background(), query, routine.ID, userID, routine.Name, routine.TargetDurationSec, itemsJSON).Scan(&routine.CreatedAt, &routine.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}

@@ -145,12 +145,25 @@ func TestUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	repo := repository.NewPostgresRoutineRepository(tx)
-	updated, err := repo.Update(&domain.Routine{ID: "1", Name: "夜トレ", Items: []domain.RoutineItem{}})
+	updated, err := repo.Update("97649158-71e1-4fdd-b749-963937ac57fe", &domain.Routine{ID: "1", Name: "夜トレ", Items: []domain.RoutineItem{}})
 
 	assert.NoError(t, err)
 	assert.Equal(t, "1", updated.ID)
 	assert.Equal(t, "夜トレ", updated.Name)
 	assert.False(t, updated.UpdatedAt.IsZero())
+}
+
+func TestUpdate_CreatesIfNotExists(t *testing.T) {
+	tx := setupDB(t)
+	// DBにルーティンが存在しない状態でUpdateを呼ぶ
+
+	repo := repository.NewPostgresRoutineRepository(tx)
+	created, err := repo.Update("97649158-71e1-4fdd-b749-963937ac57fe", &domain.Routine{ID: "new-1", Name: "新規トレ", Items: []domain.RoutineItem{}})
+
+	assert.NoError(t, err)
+	assert.Equal(t, "new-1", created.ID)
+	assert.Equal(t, "新規トレ", created.Name)
+	assert.False(t, created.CreatedAt.IsZero())
 }
 
 func TestDelete(t *testing.T) {
@@ -190,7 +203,7 @@ func TestUpdate_DBError(t *testing.T) {
 	db.Close()
 
 	repo := repository.NewPostgresRoutineRepository(db)
-	_, err = repo.Update(&domain.Routine{ID: "1", Name: "夜トレ", Items: []domain.RoutineItem{}})
+	_, err = repo.Update("97649158-71e1-4fdd-b749-963937ac57fe", &domain.Routine{ID: "1", Name: "夜トレ", Items: []domain.RoutineItem{}})
 
 	assert.Error(t, err)
 }

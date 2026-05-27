@@ -25,11 +25,11 @@ func (m *mockRoutineRepository) FindByID(id string) (*domain.Routine, error) {
 	return m.routine, nil
 }
 
-func (m *mockRoutineRepository) Create(routine *domain.Routine) (*domain.Routine, error) {
+func (m *mockRoutineRepository) Create(userID string, routine *domain.Routine) (*domain.Routine, error) {
 	return m.routine, nil
 }
 
-func (m *mockRoutineRepository) Update(routine *domain.Routine) (*domain.Routine, error) {
+func (m *mockRoutineRepository) Update(userID string, routine *domain.Routine) (*domain.Routine, error) {
 	return m.routine, nil
 }
 

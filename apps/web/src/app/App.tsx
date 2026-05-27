@@ -5,7 +5,7 @@ import type { AuthService, AuthUser } from '@timeapp/core';
 import type { RoutineRepository } from '@timeapp/core';
 import type { Routine } from '@timeapp/core';
 import { duplicateRoutine } from '@timeapp/core';
-import { SupabaseRoutineRepository } from '../features/routines/supabaseRoutineRepository';
+import { GoRoutineRepository } from '../features/routines/goRoutineRepository';
 import { BrowserVoiceService } from '../features/voice/browserVoiceService';
 import { BrowserWakeLockService } from '../features/wakeLock/browserWakeLockService';
 import type { VoiceService } from '@timeapp/core';
@@ -28,7 +28,7 @@ type AuthenticatedAppProps = {
 
 export function AuthenticatedApp({
   authService,
-  createRoutineRepository = (user) => new SupabaseRoutineRepository(user.id),
+  createRoutineRepository = (user) => new GoRoutineRepository(user.id),
 }: AuthenticatedAppProps) {
   return (
     <AuthProvider authService={authService}>
