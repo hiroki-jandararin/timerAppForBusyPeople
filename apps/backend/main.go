@@ -24,8 +24,9 @@ func main() {
 	repo := repository.NewPostgresRoutineRepository(db)
 	h := handler.NewRoutineHandler(repo) // ここは実際のリポジトリを渡すべき
 
-	http.HandleFunc("/routines", h.GetRoutines)
+	http.HandleFunc("GET /routines", h.GetRoutines)
 	http.HandleFunc("GET /routines/{id}", h.GetRoutineByID)
-	http.HandleFunc("/routines", h.CreateRoutine)
+	http.HandleFunc("POST /routines", h.CreateRoutine)
+	http.HandleFunc("PUT /routines/{id}", h.UpdateRoutine)
 	http.ListenAndServe(":8080", nil)
 }

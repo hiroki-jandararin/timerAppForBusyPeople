@@ -29,6 +29,10 @@ func (m *mockRoutineRepository) Create(routine *domain.Routine) (*domain.Routine
 	return m.routine, nil
 }
 
+func (m *mockRoutineRepository) Update(routine *domain.Routine) (*domain.Routine, error) {
+	return m.routine, nil
+}
+
 func intPtr(v int) *int       { return &v }
 func strPtr(v string) *string { return &v }
 
@@ -101,6 +105,20 @@ func TestGetRoutineByID(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
 	assert.JSONEq(t, `{"id":"1","name":"朝トレ","items":[],"createdAt":"0001-01-01T00:00:00Z","updatedAt":"0001-01-01T00:00:00Z"}`, rr.Body.String())
+}
+
+func TestUpdateRoutine(t *testing.T) {
+	body := `{"name":"夜トレ","items":[]}`
+	req := httptest.NewRequest("PUT", "/routines/1", strings.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	expectedRoutine := &domain.Routine{ID: "1", Name: "夜トレ", Items: []domain.RoutineItem{}}
+	h := handler.NewRoutineHandler(&mockRoutineRepository{routine: expectedRoutine})
+	h.UpdateRoutine(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+	assert.JSONEq(t, `{"id":"1","name":"夜トレ","items":[],"createdAt":"0001-01-01T00:00:00Z","updatedAt":"0001-01-01T00:00:00Z"}`, rr.Body.String())
 }
 
 func TestCreateRoutine(t *testing.T) {

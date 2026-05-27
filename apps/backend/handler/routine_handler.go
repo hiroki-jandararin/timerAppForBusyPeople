@@ -58,3 +58,19 @@ func (h *RoutineHandler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(createdRoutine)
 }
+
+func (h *RoutineHandler) UpdateRoutine(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var routine domain.Routine
+	if err := json.NewDecoder(r.Body).Decode(&routine); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	updatedRoutine, err := h.repo.Update(&routine)
+	if err != nil {
+		http.Error(w, "Failed to update routine", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(updatedRoutine)
+}

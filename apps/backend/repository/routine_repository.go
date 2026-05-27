@@ -66,6 +66,19 @@ func (r *postgresRoutineRepository) FindByID(id string) (*domain.Routine, error)
 	return &routine, nil
 }
 
+func (r *postgresRoutineRepository) Update(routine *domain.Routine) (*domain.Routine, error) {
+	itemsJSON, err := json.Marshal(routine.Items)
+	if err != nil {
+		return nil, err
+	}
+	query := `UPDATE routines SET name = $1, target_duration_sec = $2, items = $3, updated_at = NOW() WHERE id = $4 RETURNING updated_at`
+	err = r.db.QueryRowContext(context.Background(), query, routine.Name, routine.TargetDurationSec, itemsJSON, routine.ID).Scan(&routine.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return routine, nil
+}
+
 func (r *postgresRoutineRepository) Create(routine *domain.Routine) (*domain.Routine, error) {
 	itemsJSON, err := json.Marshal(routine.Items)
 	if err != nil {
