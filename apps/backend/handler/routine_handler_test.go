@@ -3,6 +3,7 @@ package handler_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/hiroki-jandararin/apps/backend/domain"
@@ -21,6 +22,10 @@ func (m *mockRoutineRepository) FindAll(userID string) ([]domain.Routine, error)
 }
 
 func (m *mockRoutineRepository) FindByID(id string) (*domain.Routine, error) {
+	return m.routine, nil
+}
+
+func (m *mockRoutineRepository) Create(routine *domain.Routine) (*domain.Routine, error) {
 	return m.routine, nil
 }
 
@@ -92,6 +97,20 @@ func TestGetRoutineByID(t *testing.T) {
 	expectedRoutine := &domain.Routine{ID: "1", Name: "朝トレ", Items: []domain.RoutineItem{}}
 	h := handler.NewRoutineHandler(&mockRoutineRepository{routine: expectedRoutine})
 	h.GetRoutineByID(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+	assert.JSONEq(t, `{"id":"1","name":"朝トレ","items":[],"createdAt":"0001-01-01T00:00:00Z","updatedAt":"0001-01-01T00:00:00Z"}`, rr.Body.String())
+}
+
+func TestCreateRoutine(t *testing.T) {
+	body := `{"name":"朝トレ","targetDurationSec":300,"items":[{"type":"workout","title":"スクワット","durationSec":30},{"type":"interval","title":"休憩","durationSec":10,"voiceText":"次はプランクです"}]}`
+	req := httptest.NewRequest("POST", "/routines", strings.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	expectedRoutine := &domain.Routine{ID: "1", Name: "朝トレ", Items: []domain.RoutineItem{}}
+	h := handler.NewRoutineHandler(&mockRoutineRepository{routine: expectedRoutine})
+	h.CreateRoutine(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))

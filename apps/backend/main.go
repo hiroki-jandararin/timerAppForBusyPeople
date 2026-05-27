@@ -25,5 +25,7 @@ func main() {
 	h := handler.NewRoutineHandler(repo) // ここは実際のリポジトリを渡すべき
 
 	http.HandleFunc("/routines", h.GetRoutines)
+	http.HandleFunc("GET /routines/{id}", h.GetRoutineByID)
+	http.HandleFunc("/routines", h.CreateRoutine)
 	http.ListenAndServe(":8080", nil)
 }

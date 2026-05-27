@@ -65,3 +65,16 @@ func (r *postgresRoutineRepository) FindByID(id string) (*domain.Routine, error)
 	}
 	return &routine, nil
 }
+
+func (r *postgresRoutineRepository) Create(routine *domain.Routine) (*domain.Routine, error) {
+	itemsJSON, err := json.Marshal(routine.Items)
+	if err != nil {
+		return nil, err
+	}
+	query := `INSERT INTO routines (id, name, target_duration_sec, items, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING created_at, updated_at`
+	err = r.db.QueryRowContext(context.Background(), query, routine.ID, routine.Name, routine.TargetDurationSec, itemsJSON).Scan(&routine.CreatedAt, &routine.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return routine, nil
+}
