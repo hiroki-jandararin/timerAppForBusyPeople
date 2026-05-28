@@ -1,0 +1,14 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "ignoreDeprecations": "6.0",
+    "types": ["react-native", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@timeapp/core": ["../../packages/core/src/index.ts"],
+      "@timeapp/api-client": ["../../packages/api-client/src/index.ts"]
+    }
+  }
+}
