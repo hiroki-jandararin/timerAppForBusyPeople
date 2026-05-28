@@ -44,12 +44,23 @@ func (h *RoutineHandler) GetRoutineByID(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(routine)
 }
 
+func decodeAndValidate(w http.ResponseWriter, r *http.Request, routine *domain.Routine) bool {
+	if err := json.NewDecoder(r.Body).Decode(routine); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return false
+	}
+	if errs := routine.Validate(); len(errs) > 0 {
+		http.Error(w, errs[0], http.StatusBadRequest)
+		return false
+	}
+	return true
+}
+
 func (h *RoutineHandler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	userID := middleware.UserIDFromContext(r.Context())
 	var routine domain.Routine
-	if err := json.NewDecoder(r.Body).Decode(&routine); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if !decodeAndValidate(w, r, &routine) {
 		return
 	}
 
@@ -74,8 +85,7 @@ func (h *RoutineHandler) UpdateRoutine(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	userID := middleware.UserIDFromContext(r.Context())
 	var routine domain.Routine
-	if err := json.NewDecoder(r.Body).Decode(&routine); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if !decodeAndValidate(w, r, &routine) {
 		return
 	}
 	routine.ID = r.PathValue("id")

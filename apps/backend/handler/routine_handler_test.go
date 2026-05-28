@@ -139,7 +139,7 @@ func TestDeleteRoutine(t *testing.T) {
 }
 
 func TestUpdateRoutine(t *testing.T) {
-	body := `{"name":"夜トレ","items":[]}`
+	body := `{"name":"夜トレ","items":[{"type":"workout","title":"スクワット","durationSec":30}]}`
 	req := httptest.NewRequest("PUT", "/routines/1", strings.NewReader(body))
 	rr := httptest.NewRecorder()
 
@@ -150,6 +150,17 @@ func TestUpdateRoutine(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
 	assert.JSONEq(t, `{"id":"1","name":"夜トレ","items":[],"createdAt":"0001-01-01T00:00:00Z","updatedAt":"0001-01-01T00:00:00Z"}`, rr.Body.String())
+}
+
+func TestCreateRoutine_InvalidBody_Returns400(t *testing.T) {
+	body := `{"name":"","items":[]}`
+	req := httptest.NewRequest("POST", "/routines", strings.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	h := handler.NewRoutineHandler(&mockRoutineRepository{})
+	h.CreateRoutine(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
 
 func TestCreateRoutine(t *testing.T) {
