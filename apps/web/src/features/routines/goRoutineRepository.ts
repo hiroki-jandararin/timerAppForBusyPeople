@@ -3,33 +3,33 @@ import type { Routine, RoutineRepository } from '@timeapp/core';
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 
 export class GoRoutineRepository implements RoutineRepository {
-  constructor(private readonly userId: string) {}
+  constructor(private readonly getToken: () => Promise<string>) {}
 
-  private get headers(): HeadersInit {
+  private async headers(): Promise<HeadersInit> {
+    const token = await this.getToken();
     return {
       'Content-Type': 'application/json',
-      'X-User-ID': this.userId,
+      'Authorization': `Bearer ${token}`,
     };
   }
 
   async findAll(): Promise<Routine[]> {
-    const res = await fetch(`${BASE_URL}/routines`, { headers: this.headers });
+    const res = await fetch(`${BASE_URL}/routines`, { headers: await this.headers() });
     if (!res.ok) throw new Error(`Failed to fetch routines: ${res.status}`);
     return res.json();
   }
 
   async findById(id: string): Promise<Routine | null> {
-    const res = await fetch(`${BASE_URL}/routines/${id}`, { headers: this.headers });
+    const res = await fetch(`${BASE_URL}/routines/${id}`, { headers: await this.headers() });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`Failed to fetch routine: ${res.status}`);
     return res.json();
   }
 
   async save(routine: Routine): Promise<void> {
-    // PUT が upsert（新規・既存どちらでも対応）
     const res = await fetch(`${BASE_URL}/routines/${routine.id}`, {
       method: 'PUT',
-      headers: this.headers,
+      headers: await this.headers(),
       body: JSON.stringify(routine),
     });
     if (!res.ok) throw new Error(`Failed to save routine: ${res.status}`);
@@ -38,7 +38,7 @@ export class GoRoutineRepository implements RoutineRepository {
   async delete(id: string): Promise<void> {
     const res = await fetch(`${BASE_URL}/routines/${id}`, {
       method: 'DELETE',
-      headers: this.headers,
+      headers: await this.headers(),
     });
     if (!res.ok) throw new Error(`Failed to delete routine: ${res.status}`);
   }

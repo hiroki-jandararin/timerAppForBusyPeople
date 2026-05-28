@@ -1,6 +1,7 @@
 package handler_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,16 +9,19 @@ import (
 
 	"github.com/hiroki-jandararin/apps/backend/domain"
 	"github.com/hiroki-jandararin/apps/backend/handler"
+	"github.com/hiroki-jandararin/apps/backend/middleware"
 	"github.com/stretchr/testify/assert"
 )
 
 // モック: FindAll が固定データを返す
 type mockRoutineRepository struct {
-	routines []domain.Routine
-	routine  *domain.Routine
+	routines       []domain.Routine
+	routine        *domain.Routine
+	capturedUserID string
 }
 
 func (m *mockRoutineRepository) FindAll(userID string) ([]domain.Routine, error) {
+	m.capturedUserID = userID
 	return m.routines, nil
 }
 
@@ -39,6 +43,19 @@ func (m *mockRoutineRepository) Delete(id string) error {
 
 func intPtr(v int) *int       { return &v }
 func strPtr(v string) *string { return &v }
+
+func TestGetRoutines_ReadsUserIDFromContext(t *testing.T) {
+	mock := &mockRoutineRepository{routines: []domain.Routine{}}
+	h := handler.NewRoutineHandler(mock)
+
+	ctx := middleware.WithUserID(context.Background(), "user-from-context")
+	req := httptest.NewRequest("GET", "/routines", nil).WithContext(ctx)
+	rr := httptest.NewRecorder()
+
+	h.GetRoutines(rr, req)
+
+	assert.Equal(t, "user-from-context", mock.capturedUserID)
+}
 
 func TestGetRoutines(t *testing.T) {
 	tests := []struct {

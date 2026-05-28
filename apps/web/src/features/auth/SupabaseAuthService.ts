@@ -41,6 +41,12 @@ export class SupabaseAuthService implements AuthService {
     const { error } = await supabase.auth.signOut();
     if (error) throw new Error(error.message);
   }
+
+  async getAccessToken(): Promise<string> {
+    const supabase = getSupabaseClient();
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? '';
+  }
 }
 
 function toAuthUser(user: User | null): AuthUser | null {

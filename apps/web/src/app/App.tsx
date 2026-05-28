@@ -16,19 +16,26 @@ import { AppRoutes } from './routes';
 type CreateRoutineRepository = (user: AuthUser) => RoutineRepository;
 
 export function App() {
-  const authService = useMemo<AuthService>(() => new SupabaseAuthService(), []);
+  const authService = useMemo(() => new SupabaseAuthService(), []);
 
-  return <AuthenticatedApp authService={authService} />;
+  return (
+    <AuthenticatedApp
+      authService={authService}
+      createRoutineRepository={() =>
+        new GoRoutineRepository(() => authService.getAccessToken())
+      }
+    />
+  );
 }
 
 type AuthenticatedAppProps = {
   authService: AuthService;
-  createRoutineRepository?: CreateRoutineRepository;
+  createRoutineRepository: CreateRoutineRepository;
 };
 
 export function AuthenticatedApp({
   authService,
-  createRoutineRepository = (user) => new GoRoutineRepository(user.id),
+  createRoutineRepository,
 }: AuthenticatedAppProps) {
   return (
     <AuthProvider authService={authService}>

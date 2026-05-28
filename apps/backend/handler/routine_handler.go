@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/hiroki-jandararin/apps/backend/domain"
+	"github.com/hiroki-jandararin/apps/backend/middleware"
 )
 
 type RoutineHandler struct {
@@ -18,7 +19,7 @@ func NewRoutineHandler(repo domain.RoutineRepository) *RoutineHandler {
 func (h *RoutineHandler) GetRoutines(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	// TODO: 認証実装後は JWT トークンから user_id を取り出す
-	userID := r.Header.Get("X-User-ID")
+	userID := middleware.UserIDFromContext(r.Context())
 	routines, err := h.repo.FindAll(userID)
 	if err != nil {
 		http.Error(w, "Failed to fetch routines", http.StatusInternalServerError)
@@ -45,7 +46,7 @@ func (h *RoutineHandler) GetRoutineByID(w http.ResponseWriter, r *http.Request) 
 
 func (h *RoutineHandler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	userID := r.Header.Get("X-User-ID")
+	userID := middleware.UserIDFromContext(r.Context())
 	var routine domain.Routine
 	if err := json.NewDecoder(r.Body).Decode(&routine); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -71,7 +72,7 @@ func (h *RoutineHandler) DeleteRoutine(w http.ResponseWriter, r *http.Request) {
 
 func (h *RoutineHandler) UpdateRoutine(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	userID := r.Header.Get("X-User-ID")
+	userID := middleware.UserIDFromContext(r.Context())
 	var routine domain.Routine
 	if err := json.NewDecoder(r.Body).Decode(&routine); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
