@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 
@@ -15,12 +17,15 @@ import (
 )
 
 func corsMiddleware(next http.Handler) http.Handler {
+	origin := os.Getenv("CORS_ALLOW_ORIGIN")
+	if origin == "" {
+		origin = "http://localhost:5173"
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
-		// プリフライトリクエストはここで終了
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -30,22 +35,20 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func main() {
-	godotenv.Load()
+func buildHandler() http.Handler {
 	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
-	defer db.Close()
 
-	jwtSecret := os.Getenv("SUPABASE_JWT_SECRET")
-	if jwtSecret == "" {
-		log.Fatal("SUPABASE_JWT_SECRET is required")
+	supabaseURL := os.Getenv("SUPABASE_URL")
+	if supabaseURL == "" {
+		log.Fatal("SUPABASE_URL is required")
 	}
 
 	repo := repository.NewPostgresRoutineRepository(db)
 	h := handler.NewRoutineHandler(repo)
-	auth := middleware.AuthMiddleware(jwtSecret)
+	auth := middleware.AuthMiddleware(supabaseURL)
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /routines", auth(http.HandlerFunc(h.GetRoutines)))
@@ -54,8 +57,18 @@ func main() {
 	mux.Handle("PUT /routines/{id}", auth(http.HandlerFunc(h.UpdateRoutine)))
 	mux.Handle("DELETE /routines/{id}", auth(http.HandlerFunc(h.DeleteRoutine)))
 
-	log.Println("Server started on :8080")
-	if err := http.ListenAndServe(":8080", corsMiddleware(mux)); err != nil {
-		log.Fatal("Server failed:", err)
+	return corsMiddleware(mux)
+}
+
+func main() {
+	godotenv.Load()
+
+	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" {
+		lambda.Start(httpadapter.NewV2(buildHandler()).ProxyWithContext)
+	} else {
+		log.Println("Server started on :8080")
+		if err := http.ListenAndServe(":8080", buildHandler()); err != nil {
+			log.Fatal("Server failed:", err)
+		}
 	}
 }
