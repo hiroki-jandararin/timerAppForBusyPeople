@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -57,16 +58,17 @@ func buildHandler() http.Handler {
 	mux.Handle("PUT /routines/{id}", auth(http.HandlerFunc(h.UpdateRoutine)))
 	mux.Handle("DELETE /routines/{id}", auth(http.HandlerFunc(h.DeleteRoutine)))
 
-	return corsMiddleware(mux)
+	return middleware.RequestLogger(corsMiddleware(mux))
 }
 
 func main() {
 	godotenv.Load()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
 	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" {
 		lambda.Start(httpadapter.NewV2(buildHandler()).ProxyWithContext)
 	} else {
-		log.Println("Server started on :8080")
+		slog.Info("サーバー起動", "port", 8080)
 		if err := http.ListenAndServe(":8080", buildHandler()); err != nil {
 			log.Fatal("Server failed:", err)
 		}

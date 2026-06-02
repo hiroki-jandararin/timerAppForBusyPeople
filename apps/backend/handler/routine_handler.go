@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"github.com/hiroki-jandararin/apps/backend/domain"
@@ -21,6 +22,7 @@ func (h *RoutineHandler) GetRoutines(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.UserIDFromContext(r.Context())
 	routines, err := h.repo.FindAll(userID)
 	if err != nil {
+		slog.Error("ルーティン一覧取得失敗", "userID", userID, "error", err)
 		http.Error(w, "Failed to fetch routines", http.StatusInternalServerError)
 		return
 	}
@@ -32,6 +34,7 @@ func (h *RoutineHandler) GetRoutineByID(w http.ResponseWriter, r *http.Request) 
 	routineID := r.PathValue("id")
 	routine, err := h.repo.FindByID(routineID)
 	if err != nil {
+		slog.Error("ルーティン取得失敗", "routineID", routineID, "error", err)
 		http.Error(w, "Failed to fetch routine", http.StatusInternalServerError)
 		return
 	}
@@ -64,6 +67,7 @@ func (h *RoutineHandler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 
 	createdRoutine, err := h.repo.Create(userID, &routine)
 	if err != nil {
+		slog.Error("ルーティン作成失敗", "userID", userID, "error", err)
 		http.Error(w, "Failed to create routine", http.StatusInternalServerError)
 		return
 	}
@@ -73,6 +77,7 @@ func (h *RoutineHandler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 func (h *RoutineHandler) DeleteRoutine(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := h.repo.Delete(id); err != nil {
+		slog.Error("ルーティン削除失敗", "routineID", id, "error", err)
 		http.Error(w, "Failed to delete routine", http.StatusInternalServerError)
 		return
 	}
@@ -90,6 +95,7 @@ func (h *RoutineHandler) UpdateRoutine(w http.ResponseWriter, r *http.Request) {
 
 	updatedRoutine, err := h.repo.Update(userID, &routine)
 	if err != nil {
+		slog.Error("ルーティン更新失敗", "userID", userID, "routineID", routine.ID, "error", err)
 		http.Error(w, "Failed to update routine", http.StatusInternalServerError)
 		return
 	}
