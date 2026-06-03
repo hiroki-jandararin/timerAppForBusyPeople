@@ -77,6 +77,7 @@ export default function RoutinesScreen() {
   });
 
   const load = useCallback(async () => {
+    if (!token) return;
     try {
       const data = await api.getAll();
       setRoutines(data);
