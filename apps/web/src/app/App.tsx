@@ -93,17 +93,15 @@ function RoutineApp({ user, createRoutineRepository, historyRepository, onSignOu
 
   useEffect(() => {
     setIsLoaded(false);
-    void reload();
+    void Promise.all([
+      repository.findAll().then(setRoutines),
+      historyRepository.findAll().then(setHistories),
+    ]).then(() => setIsLoaded(true));
   }, [repository]);
 
   async function reload() {
-    const [savedRoutines, savedHistories] = await Promise.all([
-      repository.findAll(),
-      historyRepository.findAll(),
-    ]);
+    const savedRoutines = await repository.findAll();
     setRoutines(savedRoutines);
-    setHistories(savedHistories);
-    setIsLoaded(true);
   }
 
   async function saveRoutine(routine: Routine) {

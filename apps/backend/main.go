@@ -41,6 +41,7 @@ func buildHandler() http.Handler {
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
+	db.SetMaxOpenConns(1)
 
 	supabaseURL := os.Getenv("SUPABASE_URL")
 	if supabaseURL == "" {
