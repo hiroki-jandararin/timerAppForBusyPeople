@@ -17,8 +17,16 @@ import {
   Text,
   View,
 } from 'react-native';
+import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
+
+const RING_RADIUS = 45;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const STROKE_WIDTH = 8;
+const VIEWBOX = 100;
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 function formatTime(sec: number): string {
   const m = Math.floor(sec / 60);
@@ -41,7 +49,6 @@ export default function TimerScreen() {
     api.getById(id).then(setRoutine);
   }, [id]);
 
-  // 1秒ごとのtick
   useEffect(() => {
     if (state.status !== 'running' && state.status !== 'countdown') return;
     const interval = setInterval(() => {
@@ -50,7 +57,6 @@ export default function TimerScreen() {
     return () => clearInterval(interval);
   }, [state.status, routine]);
 
-  // プログレスバーアニメーション
   useEffect(() => {
     if (!routine || state.status !== 'running') return;
     const currentItem = routine.items[state.currentIndex];
@@ -74,10 +80,8 @@ export default function TimerScreen() {
   const currentItem = routine.items[state.currentIndex];
   const isInterval = currentItem?.type === 'interval';
   const accentColor = isInterval ? Colors.green : Colors.orange;
-
   const send = (action: TimerAction) => dispatch(action);
 
-  // 完了画面
   if (state.status === 'finished') {
     return (
       <View style={[styles.center, { backgroundColor: Colors.bg }]}>
@@ -94,14 +98,11 @@ export default function TimerScreen() {
     );
   }
 
-  // アイドル画面（スタート前）
   if (state.status === 'idle') {
     return (
       <View style={[styles.center, { backgroundColor: Colors.bg }]}>
         <Text style={styles.routineName}>{routine.name}</Text>
-        <Text style={styles.routineMeta}>
-          {routine.items.length}種目
-        </Text>
+        <Text style={styles.routineMeta}>{routine.items.length}種目</Text>
         <Pressable
           style={({ pressed }) => [
             styles.startBtn,
@@ -116,7 +117,6 @@ export default function TimerScreen() {
     );
   }
 
-  // カウントダウン画面
   if (state.status === 'countdown') {
     return (
       <View style={[styles.center, { backgroundColor: Colors.bg }]}>
@@ -127,14 +127,20 @@ export default function TimerScreen() {
   }
 
   // 実行中 / 一時停止中
-  const progressWidth = progressAnim.interpolate({
+  const dashOffset = progressAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
+    outputRange: [RING_CIRCUMFERENCE, 0],
   });
+
+  const overallProgress =
+    routine.items.length > 0 ? (state.currentIndex / routine.items.length) * 100 : 0;
+
+  const isWarning = state.remainingSec > 0 && state.remainingSec <= 3;
+  const ringColor = isWarning ? Colors.yellow : accentColor;
 
   return (
     <View style={styles.container}>
-      {/* ヘッダー情報 */}
+      {/* ヘッダー */}
       <View style={styles.topInfo}>
         <Text style={styles.routineNameSmall}>{routine.name}</Text>
         <Text style={styles.indexInfo}>
@@ -142,75 +148,112 @@ export default function TimerScreen() {
         </Text>
       </View>
 
-      {/* メインエリア */}
+      {/* 中央: リング＋アイテム名＋次の種目 */}
       <View style={styles.mainArea}>
-        <View style={[styles.itemTypeBadge, { backgroundColor: `${accentColor}20` }]}>
-          <Text style={[styles.itemTypeText, { color: accentColor }]}>
-            {isInterval ? '休憩' : '種目'}
-          </Text>
+        <View style={styles.ringWrapper}>
+          <Svg
+            width="100%"
+            height="100%"
+            viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
+            style={StyleSheet.absoluteFill}
+          >
+            <Defs>
+              <LinearGradient id="workGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <Stop offset="0%" stopColor="#FF6B35" />
+                <Stop offset="100%" stopColor="#FFA94D" />
+              </LinearGradient>
+            </Defs>
+            <Circle
+              cx={VIEWBOX / 2}
+              cy={VIEWBOX / 2}
+              r={RING_RADIUS}
+              fill="none"
+              stroke={Colors.cardBorder}
+              strokeWidth={STROKE_WIDTH}
+            />
+            <AnimatedCircle
+              cx={VIEWBOX / 2}
+              cy={VIEWBOX / 2}
+              r={RING_RADIUS}
+              fill="none"
+              stroke={isWarning || isInterval ? ringColor : 'url(#workGradient)'}
+              strokeWidth={STROKE_WIDTH}
+              strokeLinecap="round"
+              strokeDasharray={RING_CIRCUMFERENCE}
+              strokeDashoffset={dashOffset}
+              transform={`rotate(-90, ${VIEWBOX / 2}, ${VIEWBOX / 2})`}
+            />
+          </Svg>
+
+          <View style={styles.ringInner}>
+            <View style={[styles.itemTypeBadge, { backgroundColor: `${accentColor}20` }]}>
+              <Text style={[styles.itemTypeText, { color: accentColor }]}>
+                {isInterval ? '休憩' : '種目'}
+              </Text>
+            </View>
+            <Text style={[styles.timerDisplay, { color: isWarning ? Colors.yellow : accentColor }]}>
+              {formatTime(state.remainingSec)}
+            </Text>
+          </View>
         </View>
 
         <Text style={styles.itemTitle} numberOfLines={2}>
           {currentItem?.title ?? ''}
         </Text>
 
-        <Text style={[styles.timerDisplay, { color: accentColor }]}>
-          {formatTime(state.remainingSec)}
-        </Text>
-      </View>
-
-      {/* プログレスバー */}
-      <View style={styles.progressTrack}>
-        <Animated.View
-          style={[
-            styles.progressFill,
-            { width: progressWidth, backgroundColor: accentColor },
-          ]}
-        />
-      </View>
-
-      {/* 次のアイテム */}
-      {routine.items[state.currentIndex + 1] && (
         <Text style={styles.nextLabel}>
-          次: {routine.items[state.currentIndex + 1].title}
+          {routine.items[state.currentIndex + 1]
+            ? `次: ${routine.items[state.currentIndex + 1].title}`
+            : ' '}
         </Text>
-      )}
-
-      {/* コントロール */}
-      <View style={styles.controls}>
-        <Pressable
-          style={({ pressed }) => [styles.ctrlBtn, pressed && { opacity: 0.6 }]}
-          onPress={() => send({ type: 'previous', routine })}
-        >
-          <Text style={styles.ctrlIcon}>⏮</Text>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.playBtn,
-            { backgroundColor: accentColor },
-            pressed && { opacity: 0.8 },
-          ]}
-          onPress={() =>
-            send(state.status === 'paused' ? { type: 'resume' } : { type: 'pause' })
-          }
-        >
-          <Text style={styles.playBtnIcon}>
-            {state.status === 'paused' ? '▶' : '⏸'}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.ctrlBtn, pressed && { opacity: 0.6 }]}
-          onPress={() => send({ type: 'skip', routine })}
-        >
-          <Text style={styles.ctrlIcon}>⏭</Text>
-        </Pressable>
       </View>
 
-      <Pressable style={styles.finishLink} onPress={() => send({ type: 'finish' })}>
-        <Text style={styles.finishLinkText}>終了する</Text>
-      </Pressable>
+      {/* 下部: 全体進捗＋コントロール＋終了 */}
+      <View style={styles.bottomArea}>
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${overallProgress}%`, backgroundColor: Colors.orange },
+            ]}
+          />
+        </View>
+
+        <View style={styles.controls}>
+          <Pressable
+            style={({ pressed }) => [styles.ctrlBtn, pressed && { opacity: 0.6 }]}
+            onPress={() => send({ type: 'previous', routine })}
+          >
+            <Text style={styles.ctrlIcon}>⏮</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.playBtn,
+              { backgroundColor: accentColor },
+              pressed && { opacity: 0.8 },
+            ]}
+            onPress={() =>
+              send(state.status === 'paused' ? { type: 'resume' } : { type: 'pause' })
+            }
+          >
+            <Text style={styles.playBtnIcon}>
+              {state.status === 'paused' ? '▶' : '⏸'}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.ctrlBtn, pressed && { opacity: 0.6 }]}
+            onPress={() => send({ type: 'skip', routine })}
+          >
+            <Text style={styles.ctrlIcon}>⏭</Text>
+          </Pressable>
+        </View>
+
+        <Pressable style={styles.finishLink} onPress={() => send({ type: 'finish' })}>
+          <Text style={styles.finishLinkText}>終了する</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -223,45 +266,76 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 32,
   },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.bg, gap: 16 },
-  topInfo: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.bg,
+    gap: 16,
+  },
+  topInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   routineNameSmall: { color: Colors.textSub, fontSize: 14, fontWeight: '600' },
   indexInfo: { color: Colors.textMuted, fontSize: 14 },
-  mainArea: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
+  mainArea: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ringWrapper: {
+    width: 240,
+    height: 240,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ringInner: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
   itemTypeBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
     borderRadius: 20,
   },
-  itemTypeText: { fontSize: 13, fontWeight: '700', letterSpacing: 1 },
+  itemTypeText: { fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  timerDisplay: {
+    fontSize: 56,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
   itemTitle: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '800',
     color: Colors.text,
     textAlign: 'center',
-    lineHeight: 36,
+    lineHeight: 30,
   },
-  timerDisplay: {
-    fontSize: 72,
-    fontWeight: '900',
-    letterSpacing: 4,
-    marginTop: 8,
+  nextLabel: {
+    color: Colors.textMuted,
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  bottomArea: {
+    gap: 20,
   },
   progressTrack: {
     height: 4,
     backgroundColor: Colors.cardBorder,
     borderRadius: 2,
     overflow: 'hidden',
-    marginBottom: 12,
   },
   progressFill: { height: '100%', borderRadius: 2 },
-  nextLabel: {
-    color: Colors.textMuted,
-    fontSize: 13,
-    textAlign: 'center',
-    marginBottom: 32,
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 32,
   },
-  controls: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 32 },
   ctrlBtn: { width: 52, height: 52, justifyContent: 'center', alignItems: 'center' },
   ctrlIcon: { fontSize: 28, color: Colors.textSub },
   playBtn: {
@@ -276,7 +350,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   playBtnIcon: { fontSize: 28, color: Colors.bg },
-  finishLink: { marginTop: 24, alignItems: 'center' },
+  finishLink: { alignItems: 'center' },
   finishLinkText: { color: Colors.textMuted, fontSize: 13 },
   // idle
   routineName: { fontSize: 28, fontWeight: '800', color: Colors.text, textAlign: 'center' },

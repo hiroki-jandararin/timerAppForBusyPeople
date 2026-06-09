@@ -1,6 +1,6 @@
 import { Colors } from '@/constants/colors';
 import type { CreateRoutineInput } from '@timeapp/api-client';
-import type { Routine, RoutineItem } from '@timeapp/core';
+import { addWorkoutSet, type Routine, type RoutineItem } from '@timeapp/core';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -37,6 +37,25 @@ export default function RoutineForm({ title, initialValues, onSubmit }: Props) {
     initialValues?.items.length ? initialValues.items : [emptyItem()],
   );
   const [saving, setSaving] = useState(false);
+  const [setFormOpen, setSetFormOpen] = useState(false);
+  const [setTitle, setSetTitle] = useState('');
+  const [setCount, setSetCount] = useState('3');
+  const [workoutSec, setWorkoutSec] = useState('60');
+  const [intervalSec, setIntervalSec] = useState('90');
+
+  const handleAddWorkoutSet = () => {
+    const draftRoutine = { id: '', name, items, createdAt: '', updatedAt: '' };
+    const updated = addWorkoutSet(draftRoutine, {
+      title: setTitle.trim() || 'ワークアウト',
+      workoutDurationSec: Number(workoutSec) || 60,
+      intervalDurationSec: Number(intervalSec) || 90,
+      setCount: Number(setCount) || 3,
+      includeLastInterval: false,
+    });
+    setItems(updated.items);
+    setSetTitle('');
+    setSetFormOpen(false);
+  };
 
   const updateItem = (index: number, patch: Partial<RoutineItem>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -48,6 +67,33 @@ export default function RoutineForm({ title, initialValues, onSubmit }: Props) {
       return;
     }
     setItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const moveItemUp = (index: number) => {
+    if (index === 0) return;
+    setItems((prev) => {
+      const next = [...prev];
+      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+      return next;
+    });
+  };
+
+  const moveItemDown = (index: number) => {
+    setItems((prev) => {
+      if (index >= prev.length - 1) return prev;
+      const next = [...prev];
+      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+      return next;
+    });
+  };
+
+  const duplicateItem = (index: number) => {
+    setItems((prev) => {
+      const copy = { ...prev[index], id: genId() };
+      const next = [...prev];
+      next.splice(index + 1, 0, copy);
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -113,9 +159,20 @@ export default function RoutineForm({ title, initialValues, onSubmit }: Props) {
                   </Pressable>
                 ))}
               </View>
-              <Pressable onPress={() => removeItem(index)} hitSlop={8}>
-                <Text style={styles.removeText}>✕</Text>
-              </Pressable>
+              <View style={styles.itemControls}>
+                <Pressable onPress={() => moveItemUp(index)} hitSlop={8}>
+                  <Text style={styles.controlText}>↑</Text>
+                </Pressable>
+                <Pressable onPress={() => moveItemDown(index)} hitSlop={8}>
+                  <Text style={styles.controlText}>↓</Text>
+                </Pressable>
+                <Pressable onPress={() => duplicateItem(index)} hitSlop={8}>
+                  <Text style={styles.controlText}>複製</Text>
+                </Pressable>
+                <Pressable onPress={() => removeItem(index)} hitSlop={8}>
+                  <Text style={styles.removeText}>✕</Text>
+                </Pressable>
+              </View>
             </View>
 
             <TextInput
@@ -155,6 +212,58 @@ export default function RoutineForm({ title, initialValues, onSubmit }: Props) {
         <Pressable style={styles.addItemBtn} onPress={() => setItems((prev) => [...prev, emptyItem()])}>
           <Text style={styles.addItemText}>＋ アイテムを追加</Text>
         </Pressable>
+
+        <Pressable style={styles.addItemBtn} onPress={() => setSetFormOpen((v) => !v)}>
+          <Text style={styles.addItemText}>セットを追加</Text>
+        </Pressable>
+
+        {setFormOpen && (
+          <View style={styles.setForm}>
+            <TextInput
+              style={styles.input}
+              placeholder="種目名"
+              placeholderTextColor={Colors.textMuted}
+              value={setTitle}
+              onChangeText={setSetTitle}
+              returnKeyType="done"
+            />
+            <View style={styles.setFormRow}>
+              <View style={styles.setFormField}>
+                <Text style={styles.fieldLabel}>種目時間(秒)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={workoutSec}
+                  onChangeText={setWorkoutSec}
+                  keyboardType="numeric"
+                  returnKeyType="done"
+                />
+              </View>
+              <View style={styles.setFormField}>
+                <Text style={styles.fieldLabel}>休憩時間(秒)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={intervalSec}
+                  onChangeText={setIntervalSec}
+                  keyboardType="numeric"
+                  returnKeyType="done"
+                />
+              </View>
+              <View style={styles.setFormField}>
+                <Text style={styles.fieldLabel}>セット数</Text>
+                <TextInput
+                  style={styles.input}
+                  value={setCount}
+                  onChangeText={setSetCount}
+                  keyboardType="numeric"
+                  returnKeyType="done"
+                />
+              </View>
+            </View>
+            <Pressable style={styles.saveBtn} onPress={handleAddWorkoutSet}>
+              <Text style={styles.saveBtnText}>追加</Text>
+            </Pressable>
+          </View>
+        )}
 
         <Pressable
           style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.8 }]}
@@ -197,6 +306,19 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  itemControls: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  controlText: { fontSize: 14, color: Colors.textSub },
+  setForm: {
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    padding: 12,
+    gap: 8,
+    marginBottom: 8,
+  },
+  setFormRow: { flexDirection: 'row', gap: 8 },
+  setFormField: { flex: 1 },
   typeToggle: { flexDirection: 'row', gap: 6 },
   typeBtn: {
     paddingHorizontal: 12,

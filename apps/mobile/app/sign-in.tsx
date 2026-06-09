@@ -18,10 +18,7 @@ const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 async function signInWithEmail(email: string, password: string): Promise<string> {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: SUPABASE_ANON_KEY,
-    },
+    headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) {
@@ -32,14 +29,28 @@ async function signInWithEmail(email: string, password: string): Promise<string>
   return data.access_token as string;
 }
 
+async function signUpWithEmail(email: string, password: string): Promise<void> {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.msg ?? body.error_description ?? 'サインアップに失敗しました');
+  }
+}
+
 export default function SignInScreen() {
   const { signIn } = useAuth();
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [signUpDone, setSignUpDone] = useState(false);
 
-  const handleSignIn = async () => {
+  const handleSubmit = async () => {
     if (!email || !password) {
       setError('メールアドレスとパスワードを入力してください');
       return;
@@ -47,13 +58,24 @@ export default function SignInScreen() {
     setError('');
     setLoading(true);
     try {
-      const token = await signInWithEmail(email.trim(), password);
-      await signIn(token);
+      if (mode === 'signin') {
+        const token = await signInWithEmail(email.trim(), password);
+        await signIn(token);
+      } else {
+        await signUpWithEmail(email.trim(), password);
+        setSignUpDone(true);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'エラーが発生しました');
     } finally {
       setLoading(false);
     }
+  };
+
+  const switchMode = () => {
+    setMode(m => m === 'signin' ? 'signup' : 'signin');
+    setError('');
+    setSignUpDone(false);
   };
 
   return (
@@ -65,57 +87,74 @@ export default function SignInScreen() {
         <Text style={styles.logo}>QuickFit</Text>
         <Text style={styles.logoSub}>Timer</Text>
 
-        <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder="メールアドレス"
-            placeholderTextColor={Colors.textMuted}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            returnKeyType="next"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="パスワード"
-            placeholderTextColor={Colors.textMuted}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            returnKeyType="done"
-            onSubmitEditing={handleSignIn}
-          />
+        {signUpDone ? (
+          <View style={styles.form}>
+            <Text style={styles.signUpDoneText}>
+              確認メールを送信しました。{'\n'}メール内のリンクをクリックしてからサインインしてください。
+            </Text>
+            <Pressable
+              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+              onPress={() => { setSignUpDone(false); setMode('signin'); }}
+            >
+              <Text style={styles.buttonText}>サインインへ</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.form}>
+            <TextInput
+              style={styles.input}
+              placeholder="メールアドレス"
+              placeholderTextColor={Colors.textMuted}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              returnKeyType="next"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="パスワード"
+              placeholderTextColor={Colors.textMuted}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              returnKeyType="done"
+              onSubmitEditing={handleSubmit}
+            />
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Pressable
-            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-            onPress={handleSignIn}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={Colors.text} />
-            ) : (
-              <Text style={styles.buttonText}>サインイン</Text>
-            )}
-          </Pressable>
-        </View>
+            <Pressable
+              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={Colors.text} />
+              ) : (
+                <Text style={styles.buttonText}>
+                  {mode === 'signin' ? 'サインイン' : 'アカウント作成'}
+                </Text>
+              )}
+            </Pressable>
+
+            <Pressable onPress={switchMode} style={styles.switchBtn}>
+              <Text style={styles.switchText}>
+                {mode === 'signin'
+                  ? 'アカウントをお持ちでない方はこちら'
+                  : 'すでにアカウントをお持ちの方はこちら'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
-  inner: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
+  container: { flex: 1, backgroundColor: Colors.bg },
+  inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 32 },
   logo: {
     fontSize: 48,
     fontWeight: '900',
@@ -131,9 +170,7 @@ const styles = StyleSheet.create({
     letterSpacing: 8,
     marginBottom: 48,
   },
-  form: {
-    gap: 12,
-  },
+  form: { gap: 12 },
   input: {
     backgroundColor: Colors.card,
     borderWidth: 1,
@@ -144,11 +181,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
     fontSize: 16,
   },
-  error: {
-    color: Colors.red,
-    fontSize: 13,
-    textAlign: 'center',
-  },
+  error: { color: Colors.red, fontSize: 13, textAlign: 'center' },
   button: {
     backgroundColor: Colors.orange,
     borderRadius: 12,
@@ -156,12 +189,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  buttonPressed: {
-    opacity: 0.8,
-  },
-  buttonText: {
+  buttonPressed: { opacity: 0.8 },
+  buttonText: { color: Colors.text, fontSize: 16, fontWeight: '700' },
+  switchBtn: { alignItems: 'center', marginTop: 4 },
+  switchText: { color: Colors.textSub, fontSize: 13 },
+  signUpDoneText: {
     color: Colors.text,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 24,
   },
 });

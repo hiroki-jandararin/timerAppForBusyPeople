@@ -1,7 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/colors';
-import { routineApiClient } from '@timeapp/api-client';
-import type { Routine } from '@timeapp/core';
+import { ApiError, routineApiClient } from '@timeapp/api-client';
+import { duplicateRoutine, type Routine } from '@timeapp/core';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -31,11 +31,13 @@ function RoutineCard({
   routine,
   onPress,
   onEdit,
+  onDuplicate,
   onDelete,
 }: {
   routine: Routine;
   onPress: () => void;
   onEdit: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -56,6 +58,9 @@ function RoutineCard({
         <Pressable style={styles.actionBtn} onPress={onEdit} hitSlop={8}>
           <Text style={styles.actionText}>編集</Text>
         </Pressable>
+        <Pressable style={styles.actionBtn} onPress={onDuplicate} hitSlop={8}>
+          <Text style={styles.actionText}>複製</Text>
+        </Pressable>
         <Pressable style={styles.actionBtn} onPress={onDelete} hitSlop={8}>
           <Text style={[styles.actionText, { color: Colors.red }]}>削除</Text>
         </Pressable>
@@ -70,6 +75,7 @@ export default function RoutinesScreen() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
 
   const api = routineApiClient({
     baseUrl: API_BASE_URL,
@@ -78,11 +84,16 @@ export default function RoutinesScreen() {
 
   const load = useCallback(async () => {
     if (!token) return;
+    setFetchError(false);
     try {
       const data = await api.getAll();
       setRoutines(data);
-    } catch {
-      Alert.alert('エラー', 'ルーティンの取得に失敗しました');
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        await signOut();
+        return;
+      }
+      setFetchError(true);
     }
   }, [token]);
 
@@ -94,6 +105,12 @@ export default function RoutinesScreen() {
     setRefreshing(true);
     await load();
     setRefreshing(false);
+  };
+
+  const handleDuplicate = async (routine: Routine) => {
+    const copy = duplicateRoutine(routine);
+    await api.create({ name: copy.name, items: copy.items });
+    await load();
   };
 
   const handleDelete = (routine: Routine) => {
@@ -132,19 +149,26 @@ export default function RoutinesScreen() {
           />
         }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>ルーティンがありません</Text>
-            <Text style={styles.emptySubText}>+ ボタンで作成しましょう</Text>
-          </View>
-        }
-        ListHeaderComponent={
-          <Text style={styles.header}>マイルーティン</Text>
+          fetchError ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyText}>取得できませんでした</Text>
+              <Pressable style={styles.retryBtn} onPress={load}>
+                <Text style={styles.retryText}>再試行</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.empty}>
+              <Text style={styles.emptyText}>ルーティンがありません</Text>
+              <Text style={styles.emptySubText}>+ ボタンで作成しましょう</Text>
+            </View>
+          )
         }
         renderItem={({ item }) => (
           <RoutineCard
             routine={item}
             onPress={() => router.push(`/(app)/routines/${item.id}/timer`)}
             onEdit={() => router.push(`/(app)/routines/${item.id}/edit`)}
+            onDuplicate={() => handleDuplicate(item)}
             onDelete={() => handleDelete(item)}
           />
         )}
@@ -152,14 +176,11 @@ export default function RoutinesScreen() {
 
       <Pressable
         style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-        onPress={() => router.push('/(app)/routines/new')}
+        onPress={() => router.push('/(app)/routines/templates')}
       >
         <Text style={styles.fabText}>＋</Text>
       </Pressable>
 
-      <Pressable style={styles.signOutBtn} onPress={signOut}>
-        <Text style={styles.signOutText}>サインアウト</Text>
-      </Pressable>
     </View>
   );
 }
@@ -168,12 +189,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.bg },
   list: { padding: 16, gap: 12, paddingBottom: 100 },
-  header: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: Colors.text,
-    marginBottom: 8,
-  },
   card: {
     backgroundColor: Colors.card,
     borderRadius: 16,
@@ -198,6 +213,8 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', marginTop: 80, gap: 8 },
   emptyText: { color: Colors.textSub, fontSize: 16 },
   emptySubText: { color: Colors.textMuted, fontSize: 13 },
+  retryBtn: { marginTop: 8, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 20, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.cardBorder },
+  retryText: { color: Colors.orange, fontSize: 14, fontWeight: '600' },
   fab: {
     position: 'absolute',
     bottom: 32,
@@ -216,6 +233,4 @@ const styles = StyleSheet.create({
   },
   fabPressed: { opacity: 0.8 },
   fabText: { color: Colors.text, fontSize: 28, fontWeight: '300', marginTop: -2 },
-  signOutBtn: { position: 'absolute', top: 8, right: 16 },
-  signOutText: { color: Colors.textMuted, fontSize: 13 },
 });
