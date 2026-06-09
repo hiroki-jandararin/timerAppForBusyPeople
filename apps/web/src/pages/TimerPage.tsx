@@ -11,12 +11,14 @@ import { initialTimerState, timerReducer, type TimerAction } from '@timeapp/core
 import type { TimerState } from '@timeapp/core';
 import type { VoiceService } from '@timeapp/core';
 import type { WakeLockService } from '@timeapp/core';
+import type { CreateWorkoutHistoryInput } from '@timeapp/core';
 
 type Props = {
   routine: Routine;
   voiceService: VoiceService;
   wakeLockService: WakeLockService;
   onBack: () => void;
+  onSaveHistory?: (input: CreateWorkoutHistoryInput) => Promise<void>;
 };
 
 const PRE_START_COUNTDOWN_SEC = 3;
@@ -35,7 +37,7 @@ type RestShorteningPlan = {
   }>;
 };
 
-export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Props) {
+export function TimerPage({ routine, voiceService, wakeLockService, onBack, onSaveHistory }: Props) {
   const [state, rawDispatch] = useReducer(timerReducer, initialTimerState);
   const [activeRoutine, setActiveRoutine] = useState(routine);
   const [plannedStartAtMs, setPlannedStartAtMs] = useState<number | null>(null);
@@ -45,6 +47,7 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
   const [isAdjustmentPromptOpen, setIsAdjustmentPromptOpen] = useState(false);
   const [hasShownAdjustmentPrompt, setHasShownAdjustmentPrompt] = useState(false);
   const stateRef = useRef<TimerState>(state);
+  const startedAtMsRef = useRef<number | null>(null);
 
   function dispatch(action: TimerAction) {
     const previous = stateRef.current;
@@ -53,6 +56,7 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
     stateRef.current = next;
     if (action.type === 'start') {
       const plannedStart = Date.now() + PRE_START_COUNTDOWN_SEC * 1000;
+      startedAtMsRef.current = plannedStart;
       setPlannedStartAtMs(plannedStart);
       setPlannedEndAtMs(plannedStart + calculateTotalDuration(activeRoutine) * 1000);
       setFinishedAtMs(null);
@@ -64,8 +68,34 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack }: Pr
       const finishedAt = Date.now();
       setFinishedAtMs(finishedAt);
       setNowMs(finishedAt);
+      if (onSaveHistory && startedAtMsRef.current) {
+        void onSaveHistory({
+          id: crypto.randomUUID(),
+          routineId: activeRoutine.id,
+          routineName: activeRoutine.name,
+          startedAt: new Date(startedAtMsRef.current).toISOString(),
+          finishedAt: new Date(finishedAt).toISOString(),
+          completed: true,
+          itemsCount: activeRoutine.items.length,
+          itemsCompleted: activeRoutine.items.length,
+        });
+      }
     }
     if (action.type === 'end') {
+      if (onSaveHistory && startedAtMsRef.current && previous.status !== 'idle') {
+        const now = Date.now();
+        void onSaveHistory({
+          id: crypto.randomUUID(),
+          routineId: activeRoutine.id,
+          routineName: activeRoutine.name,
+          startedAt: new Date(startedAtMsRef.current).toISOString(),
+          finishedAt: new Date(now).toISOString(),
+          completed: false,
+          itemsCount: activeRoutine.items.length,
+          itemsCompleted: previous.currentIndex,
+        });
+      }
+      startedAtMsRef.current = null;
       setPlannedStartAtMs(null);
       setPlannedEndAtMs(null);
       setFinishedAtMs(null);

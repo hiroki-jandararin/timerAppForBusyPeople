@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { createRoutine } from '@timeapp/core';
 import { createRoutineFromTemplate, type RoutineTemplate } from '@timeapp/core';
+import type { CreateWorkoutHistoryInput, WorkoutHistory } from '@timeapp/core';
 import { RoutineEditPage } from '../pages/RoutineEditPage';
 import { RoutineListPage } from '../pages/RoutineListPage';
 import { TemplateSelectPage } from '../pages/TemplateSelectPage';
 import { TimerPage } from '../pages/TimerPage';
+import { HistoryPage } from '../pages/HistoryPage';
 import type { Routine } from '@timeapp/core';
 import type { VoiceService } from '@timeapp/core';
 import type { WakeLockService } from '@timeapp/core';
@@ -13,9 +15,11 @@ import type { WakeLockService } from '@timeapp/core';
 type AppRoutesProps = {
   isLoaded: boolean;
   routines: Routine[];
+  histories: WorkoutHistory[];
   onSave: (routine: Routine) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onDuplicate: (routine: Routine) => Promise<void>;
+  onSaveHistory: (input: CreateWorkoutHistoryInput) => Promise<void>;
   currentUserEmail: string | null;
   onSignOut: () => Promise<void>;
   voiceService: VoiceService;
@@ -25,9 +29,11 @@ type AppRoutesProps = {
 export function AppRoutes({
   isLoaded,
   routines,
+  histories,
   onSave,
   onDelete,
   onDuplicate,
+  onSaveHistory,
   currentUserEmail,
   onSignOut,
   voiceService,
@@ -65,8 +71,13 @@ export function AppRoutes({
               routines={routines}
               voiceService={voiceService}
               wakeLockService={wakeLockService}
+              onSaveHistory={onSaveHistory}
             />
           }
+        />
+        <Route
+          path="/history"
+          element={<HistoryRoute histories={histories} />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -107,6 +118,7 @@ function ListRoute({
       onDelete={onDelete}
       currentUserEmail={currentUserEmail}
       onSignOut={onSignOut}
+      onShowHistory={() => navigate('/history')}
     />
   );
 }
@@ -189,9 +201,10 @@ type TimerRouteProps = {
   routines: Routine[];
   voiceService: VoiceService;
   wakeLockService: WakeLockService;
+  onSaveHistory: (input: CreateWorkoutHistoryInput) => Promise<void>;
 };
 
-function TimerRoute({ isLoaded, routines, voiceService, wakeLockService }: TimerRouteProps) {
+function TimerRoute({ isLoaded, routines, voiceService, wakeLockService, onSaveHistory }: TimerRouteProps) {
   const navigate = useNavigate();
   const { routineId } = useParams();
 
@@ -210,8 +223,14 @@ function TimerRoute({ isLoaded, routines, voiceService, wakeLockService }: Timer
       voiceService={voiceService}
       wakeLockService={wakeLockService}
       onBack={() => navigate('/')}
+      onSaveHistory={onSaveHistory}
     />
   );
+}
+
+function HistoryRoute({ histories }: { histories: WorkoutHistory[] }) {
+  const navigate = useNavigate();
+  return <HistoryPage histories={histories} onBack={() => navigate('/')} />;
 }
 
 function LoadingPage() {

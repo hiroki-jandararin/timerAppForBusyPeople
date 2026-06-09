@@ -8,6 +8,7 @@ type Props = {
   onStart: (id: string) => void;
   onDuplicate: (routine: Routine) => void | Promise<void>;
   onDelete: (id: string) => void | Promise<void>;
+  onShowHistory?: () => void;
   currentUserEmail?: string | null;
   onSignOut?: () => void | Promise<void>;
 };
@@ -19,6 +20,7 @@ export function RoutineListPage({
   onStart,
   onDuplicate,
   onDelete,
+  onShowHistory,
   currentUserEmail,
   onSignOut,
 }: Props) {
@@ -59,13 +61,23 @@ export function RoutineListPage({
               忙しい人のための筋トレタイマー
             </p>
           </div>
-          <button
-            className="mb-1 shrink-0 rounded-xl border border-[#FF6B3545] px-4 py-2 text-sm font-black tracking-wide text-[#FF6B35] transition active:scale-[0.95]"
-            style={{ backgroundColor: '#FF6B3512' }}
-            onClick={onCreate}
-          >
-            ＋ 新規
-          </button>
+          <div className="mb-1 flex shrink-0 gap-2">
+            {onShowHistory && (
+              <button
+                className="rounded-xl border border-[#3C3C42] px-3 py-2 text-sm font-black tracking-wide text-[#A0A0A5] transition hover:text-[#F5F5F5] active:scale-[0.95]"
+                onClick={onShowHistory}
+              >
+                📅 履歴
+              </button>
+            )}
+            <button
+              className="rounded-xl border border-[#FF6B3545] px-4 py-2 text-sm font-black tracking-wide text-[#FF6B35] transition active:scale-[0.95]"
+              style={{ backgroundColor: '#FF6B3512' }}
+              onClick={onCreate}
+            >
+              ＋ 新規
+            </button>
+          </div>
         </div>
 
         {/* Divider */}

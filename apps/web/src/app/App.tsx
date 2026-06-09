@@ -3,9 +3,10 @@ import { AuthProvider, useAuth } from '../features/auth/AuthProvider';
 import { SupabaseAuthService } from '../features/auth/SupabaseAuthService';
 import type { AuthService, AuthUser } from '@timeapp/core';
 import type { RoutineRepository } from '@timeapp/core';
-import type { Routine } from '@timeapp/core';
+import type { Routine, WorkoutHistory, CreateWorkoutHistoryInput } from '@timeapp/core';
 import { duplicateRoutine } from '@timeapp/core';
 import { GoRoutineRepository } from '../features/routines/goRoutineRepository';
+import { GoWorkoutHistoryRepository } from '../features/workoutHistory/goWorkoutHistoryRepository';
 import { BrowserVoiceService } from '../features/voice/browserVoiceService';
 import { BrowserWakeLockService } from '../features/wakeLock/browserWakeLockService';
 import type { VoiceService } from '@timeapp/core';
@@ -17,13 +18,13 @@ type CreateRoutineRepository = (user: AuthUser) => RoutineRepository;
 
 export function App() {
   const authService = useMemo(() => new SupabaseAuthService(), []);
+  const getToken = () => authService.getAccessToken();
 
   return (
     <AuthenticatedApp
       authService={authService}
-      createRoutineRepository={() =>
-        new GoRoutineRepository(() => authService.getAccessToken())
-      }
+      createRoutineRepository={() => new GoRoutineRepository(getToken)}
+      historyRepository={new GoWorkoutHistoryRepository(getToken)}
     />
   );
 }
@@ -31,24 +32,30 @@ export function App() {
 type AuthenticatedAppProps = {
   authService: AuthService;
   createRoutineRepository: CreateRoutineRepository;
+  historyRepository: GoWorkoutHistoryRepository;
 };
 
 export function AuthenticatedApp({
   authService,
   createRoutineRepository,
+  historyRepository,
 }: AuthenticatedAppProps) {
   return (
     <AuthProvider authService={authService}>
-      <AppShell createRoutineRepository={createRoutineRepository} />
+      <AppShell
+        createRoutineRepository={createRoutineRepository}
+        historyRepository={historyRepository}
+      />
     </AuthProvider>
   );
 }
 
 type AppShellProps = {
   createRoutineRepository: CreateRoutineRepository;
+  historyRepository: GoWorkoutHistoryRepository;
 };
 
-function AppShell({ createRoutineRepository }: AppShellProps) {
+function AppShell({ createRoutineRepository, historyRepository }: AppShellProps) {
   const auth = useAuth();
 
   if (auth.isLoading) {
@@ -63,6 +70,7 @@ function AppShell({ createRoutineRepository }: AppShellProps) {
     <RoutineApp
       user={auth.user}
       createRoutineRepository={createRoutineRepository}
+      historyRepository={historyRepository}
       onSignOut={auth.signOut}
     />
   );
@@ -71,14 +79,16 @@ function AppShell({ createRoutineRepository }: AppShellProps) {
 type RoutineAppProps = {
   user: AuthUser;
   createRoutineRepository: CreateRoutineRepository;
+  historyRepository: GoWorkoutHistoryRepository;
   onSignOut: () => Promise<void>;
 };
 
-function RoutineApp({ user, createRoutineRepository, onSignOut }: RoutineAppProps) {
+function RoutineApp({ user, createRoutineRepository, historyRepository, onSignOut }: RoutineAppProps) {
   const repository = useMemo(() => createRoutineRepository(user), [createRoutineRepository, user]);
   const voiceService = useMemo<VoiceService>(() => new BrowserVoiceService(), []);
   const wakeLockService = useMemo<WakeLockService>(() => new BrowserWakeLockService(), []);
   const [routines, setRoutines] = useState<Routine[]>([]);
+  const [histories, setHistories] = useState<WorkoutHistory[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -87,8 +97,12 @@ function RoutineApp({ user, createRoutineRepository, onSignOut }: RoutineAppProp
   }, [repository]);
 
   async function reload() {
-    const savedRoutines = await repository.findAll();
+    const [savedRoutines, savedHistories] = await Promise.all([
+      repository.findAll(),
+      historyRepository.findAll(),
+    ]);
     setRoutines(savedRoutines);
+    setHistories(savedHistories);
     setIsLoaded(true);
   }
 
@@ -110,13 +124,20 @@ function RoutineApp({ user, createRoutineRepository, onSignOut }: RoutineAppProp
     await reload();
   }
 
+  async function saveHistory(input: CreateWorkoutHistoryInput) {
+    const created = await historyRepository.create(input);
+    setHistories(prev => [created, ...prev]);
+  }
+
   return (
     <AppRoutes
       isLoaded={isLoaded}
       routines={routines}
+      histories={histories}
       onSave={saveRoutine}
       onDelete={removeRoutine}
       onDuplicate={copyRoutine}
+      onSaveHistory={saveHistory}
       currentUserEmail={user.email}
       onSignOut={onSignOut}
       voiceService={voiceService}

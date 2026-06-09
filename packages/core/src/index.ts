@@ -11,3 +11,4 @@ export * from './features/timer/timerService';
 export * from './features/voice/voiceService';
 export * from './features/wakeLock/wakeLockService';
 export * from './constants/durationPresets';
+export * from './features/workoutHistory/workoutHistoryTypes';
