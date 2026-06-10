@@ -66,9 +66,7 @@ export function CreateMethodPage({ onSelectTemplate, onSelectAI, onSelectBlank, 
           onClick={onSelectBlank}
         >
           <p className="m-0 text-lg font-black text-[#F5F5F5]">最初から作る</p>
-          <p className="m-0 mt-1 text-sm font-bold text-[#505058]">
-            何も入っていない状態からゼロで作成
-          </p>
+          <p className="m-0 mt-1 text-sm font-bold text-[#505058]">何も入っていない状態から作成</p>
         </button>
       </div>
     </main>

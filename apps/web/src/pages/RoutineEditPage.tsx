@@ -30,10 +30,27 @@ type Props = {
   generateAiRoutine?: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
 };
 
-const AI_BODY_PARTS = ['胸', '背中', '肩', '腕（前）', '腕（後ろ）', '足（前）', '足（後ろ）', '腹筋', '背筋', 'ふくらはぎ'] as const;
+const AI_BODY_PARTS = [
+  '胸',
+  '背中',
+  '肩',
+  '腕（前）',
+  '腕（後ろ）',
+  '足（前）',
+  '足（後ろ）',
+  '腹筋',
+  '背筋',
+  'ふくらはぎ',
+] as const;
 const AI_DURATION_PRESETS = [10, 15, 20, 30, 45, 60] as const;
 
-export function RoutineEditPage({ routine, existingRoutines, onSave, onBack, generateAiRoutine }: Props) {
+export function RoutineEditPage({
+  routine,
+  existingRoutines,
+  onSave,
+  onBack,
+  generateAiRoutine,
+}: Props) {
   const [draft, setDraft] = useState(routine);
   const [errors, setErrors] = useState<string[]>([]);
   const [targetMinutes, setTargetMinutes] = useState(() => {
@@ -182,7 +199,7 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack, gen
             inputMode="numeric"
             value={targetMinutes}
             onChange={(event) => updateTargetDuration(event.target.value)}
-            placeholder="45"
+            placeholder="目標時間を入力"
           />
         </label>
 
@@ -190,7 +207,10 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack, gen
         <div className="grid grid-cols-2 gap-2">
           <button
             className="min-h-11 rounded-xl border border-[#FF6B3535] bg-[#FF6B3510] text-sm font-black tracking-wide text-[#FF6B35] transition active:scale-[0.97]"
-            onClick={() => { setIsExercisePickerOpen((v) => !v); setIsAiPanelOpen(false); }}
+            onClick={() => {
+              setIsExercisePickerOpen((v) => !v);
+              setIsAiPanelOpen(false);
+            }}
           >
             {isExercisePickerOpen ? '種目選択を閉じる' : 'ワークアウト追加'}
           </button>
@@ -204,7 +224,10 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack, gen
         {generateAiRoutine && (
           <button
             className="min-h-11 w-full rounded-xl border border-[#818CF830] bg-[#818CF810] text-sm font-black tracking-wide text-[#818CF8] transition active:scale-[0.97]"
-            onClick={() => { setIsAiPanelOpen((v) => !v); setIsExercisePickerOpen(false); }}
+            onClick={() => {
+              setIsAiPanelOpen((v) => !v);
+              setIsExercisePickerOpen(false);
+            }}
           >
             {isAiPanelOpen ? 'AIパネルを閉じる' : 'AIで追加'}
           </button>
@@ -290,7 +313,9 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack, gen
               <div>
                 <p className="m-0 mb-2 text-xs font-black tracking-widest uppercase text-[#A0A0A5]">
                   部位
-                  <span className="ml-2 text-[#505058] normal-case tracking-normal">複数選択可</span>
+                  <span className="ml-2 text-[#505058] normal-case tracking-normal">
+                    複数選択可
+                  </span>
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {AI_BODY_PARTS.map((part) => {
@@ -308,7 +333,11 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack, gen
                         style={
                           selected
                             ? { background: '#818CF8', color: '#F5F5F5' }
-                            : { background: '#2C2C30', color: '#A0A0A5', border: '1px solid #3C3C42' }
+                            : {
+                                background: '#2C2C30',
+                                color: '#A0A0A5',
+                                border: '1px solid #3C3C42',
+                              }
                         }
                       >
                         {part}
@@ -352,9 +381,7 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack, gen
                 disabled={isAiLoading}
               />
 
-              {aiError && (
-                <p className="m-0 text-xs font-bold text-[#EF4444]">{aiError}</p>
-              )}
+              {aiError && <p className="m-0 text-xs font-bold text-[#EF4444]">{aiError}</p>}
 
               <button
                 type="button"

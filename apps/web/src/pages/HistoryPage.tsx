@@ -191,28 +191,49 @@ type Stats = {
   totalCount: number;
 };
 
+export function calcCurrentStreak(
+  byDate: Map<string, WorkoutHistory[]>,
+  todayStr: string
+): number {
+  const yesterday = new Date(todayStr + 'T00:00:00');
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = toDateString(
+    yesterday.getFullYear(),
+    yesterday.getMonth(),
+    yesterday.getDate()
+  );
+
+  // 今日か昨日にワークアウトがあれば streak 継続中
+  const startStr = byDate.has(todayStr)
+    ? todayStr
+    : byDate.has(yesterdayStr)
+      ? yesterdayStr
+      : null;
+  if (!startStr) return 0;
+
+  let streak = 0;
+  const cursor = new Date(startStr + 'T00:00:00');
+  for (let i = 0; i < 365; i++) {
+    const d = toDateString(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
+    if (byDate.has(d)) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
 function calcStats(histories: WorkoutHistory[], byDate: Map<string, WorkoutHistory[]>): Stats {
   const totalCount = histories.length;
   if (totalCount === 0) return { currentStreak: 0, longestStreak: 0, totalCount: 0 };
 
   const today = toDateString(...todayParts());
-  let currentStreak = 0;
+  const currentStreak = calcCurrentStreak(byDate, today);
+
   let longestStreak = 0;
   let streak = 0;
-  let cursor = new Date();
-
-  // currentStreak: count back from today
-  for (let i = 0; i < 365; i++) {
-    const d = toDateString(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
-    if (byDate.has(d)) {
-      if (i === 0 || currentStreak > 0) currentStreak++;
-    } else {
-      if (d !== today || i > 0) break;
-    }
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  // longestStreak: scan all dates sorted
   const sortedDates = [...byDate.keys()].sort();
   for (let i = 0; i < sortedDates.length; i++) {
     if (i === 0) {

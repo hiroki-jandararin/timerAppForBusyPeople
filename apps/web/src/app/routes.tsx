@@ -196,6 +196,7 @@ function NewRoute({ isLoaded, routines, onSave, generateAiRoutine }: NewRoutePro
         navigate('/');
       }}
       onBack={() => setState({ step: 'method' })}
+      generateAiRoutine={generateAiRoutine}
     />
   );
 }
