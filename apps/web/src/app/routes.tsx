@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
-import { createRoutine } from '@timeapp/core';
-import { createRoutineFromTemplate, type RoutineTemplate } from '@timeapp/core';
+import { createRoutine, createRoutineFromTemplate } from '@timeapp/core';
+import type { RoutineTemplate } from '@timeapp/core';
 import type { CreateWorkoutHistoryInput, WorkoutHistory } from '@timeapp/core';
 import { RoutineEditPage } from '../pages/RoutineEditPage';
 import { RoutineListPage } from '../pages/RoutineListPage';
 import { TemplateSelectPage } from '../pages/TemplateSelectPage';
+import { AIPromptPage } from '../pages/AIPromptPage';
+import { CreateMethodPage } from '../pages/CreateMethodPage';
 import { TimerPage } from '../pages/TimerPage';
 import { HistoryPage } from '../pages/HistoryPage';
 import type { Routine } from '@timeapp/core';
@@ -20,6 +22,7 @@ type AppRoutesProps = {
   onDelete: (id: string) => Promise<void>;
   onDuplicate: (routine: Routine) => Promise<void>;
   onSaveHistory: (input: CreateWorkoutHistoryInput) => Promise<void>;
+  generateAiRoutine: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
   currentUserEmail: string | null;
   onSignOut: () => Promise<void>;
   voiceService: VoiceService;
@@ -34,6 +37,7 @@ export function AppRoutes({
   onDelete,
   onDuplicate,
   onSaveHistory,
+  generateAiRoutine,
   currentUserEmail,
   onSignOut,
   voiceService,
@@ -57,7 +61,14 @@ export function AppRoutes({
         />
         <Route
           path="/routines/new"
-          element={<NewRoute isLoaded={isLoaded} routines={routines} onSave={onSave} />}
+          element={
+            <NewRoute
+              isLoaded={isLoaded}
+              routines={routines}
+              onSave={onSave}
+              generateAiRoutine={generateAiRoutine}
+            />
+          }
         />
         <Route
           path="/routines/:routineId/edit"
@@ -127,39 +138,64 @@ type NewRouteProps = {
   isLoaded: boolean;
   routines: Routine[];
   onSave: (routine: Routine) => Promise<void>;
+  generateAiRoutine: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
 };
 
-function NewRoute({ isLoaded, routines, onSave }: NewRouteProps) {
+type NewRouteState =
+  | { step: 'method' }
+  | { step: 'template' }
+  | { step: 'ai' }
+  | { step: 'edit'; routine: Routine };
+
+function NewRoute({ isLoaded, routines, onSave, generateAiRoutine }: NewRouteProps) {
   const navigate = useNavigate();
-  const [selectedTemplate, setSelectedTemplate] = useState<RoutineTemplate | null | 'blank'>(null);
+  const [state, setState] = useState<NewRouteState>({ step: 'method' });
 
   if (!isLoaded) {
     return <LoadingPage />;
   }
 
-  if (selectedTemplate === null) {
+  if (state.step === 'method') {
     return (
-      <TemplateSelectPage
-        onSelect={(template) => setSelectedTemplate(template ?? 'blank')}
+      <CreateMethodPage
+        onSelectAI={() => setState({ step: 'ai' })}
+        onSelectTemplate={() => setState({ step: 'template' })}
+        onSelectBlank={() => setState({ step: 'edit', routine: createRoutine() })}
         onBack={() => navigate('/')}
       />
     );
   }
 
-  const routine =
-    selectedTemplate === 'blank'
-      ? createRoutine()
-      : createRoutineFromTemplate(selectedTemplate);
+  if (state.step === 'template') {
+    return (
+      <TemplateSelectPage
+        onSelect={(template: RoutineTemplate) =>
+          setState({ step: 'edit', routine: createRoutineFromTemplate(template) })
+        }
+        onBack={() => setState({ step: 'method' })}
+      />
+    );
+  }
+
+  if (state.step === 'ai') {
+    return (
+      <AIPromptPage
+        generateAiRoutine={generateAiRoutine}
+        onGenerate={(routine) => setState({ step: 'edit', routine })}
+        onBack={() => setState({ step: 'method' })}
+      />
+    );
+  }
 
   return (
     <RoutineEditPage
-      routine={routine}
+      routine={state.routine}
       existingRoutines={routines}
       onSave={async (nextRoutine) => {
         await onSave(nextRoutine);
         navigate('/');
       }}
-      onBack={() => setSelectedTemplate(null)}
+      onBack={() => setState({ step: 'method' })}
     />
   );
 }

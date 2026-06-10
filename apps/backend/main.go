@@ -54,6 +54,8 @@ func buildHandler() http.Handler {
 	historyRepo := repository.NewPostgresWorkoutHistoryRepository(db)
 	historyHandler := handler.NewWorkoutHistoryHandler(historyRepo)
 
+	aiHandler := handler.NewAIHandler()
+
 	auth := middleware.AuthMiddleware(supabaseURL)
 
 	mux := http.NewServeMux()
@@ -64,6 +66,7 @@ func buildHandler() http.Handler {
 	mux.Handle("DELETE /routines/{id}", auth(http.HandlerFunc(h.DeleteRoutine)))
 	mux.Handle("POST /workout-histories", auth(http.HandlerFunc(historyHandler.CreateWorkoutHistory)))
 	mux.Handle("GET /workout-histories", auth(http.HandlerFunc(historyHandler.GetWorkoutHistories)))
+	mux.Handle("POST /ai/generate-routine", auth(http.HandlerFunc(aiHandler.GenerateRoutine)))
 
 	return middleware.RequestLogger(corsMiddleware(mux))
 }

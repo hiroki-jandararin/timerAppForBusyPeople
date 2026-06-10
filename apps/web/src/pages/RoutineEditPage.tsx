@@ -11,6 +11,7 @@ import {
   updateRoutineTargetDuration,
   updateItem,
   validateRoutine,
+  MUSCLE_GROUPS,
 } from '@timeapp/core';
 import {
   calculateTargetDifference,
@@ -35,6 +36,7 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
     const targetDuration = getTargetDuration(routine);
     return targetDuration === null ? '' : String(Math.floor(targetDuration / 60));
   });
+  const [isExercisePickerOpen, setIsExercisePickerOpen] = useState(false);
   const [isSetFormOpen, setIsSetFormOpen] = useState(true);
   const [setTitle, setSetTitle] = useState('ワークアウト');
   const [setWorkoutDurationSec, setSetWorkoutDurationSec] = useState('60');
@@ -155,9 +157,9 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
         <div className="grid grid-cols-2 gap-2">
           <button
             className="min-h-11 rounded-xl border border-[#FF6B3535] bg-[#FF6B3510] text-sm font-black tracking-wide text-[#FF6B35] transition active:scale-[0.97]"
-            onClick={() => setDraft(addItem(draft, 'workout'))}
+            onClick={() => setIsExercisePickerOpen((v) => !v)}
           >
-            ワークアウト追加
+            {isExercisePickerOpen ? '種目選択を閉じる' : 'ワークアウト追加'}
           </button>
           <button
             className="min-h-11 rounded-xl border border-[#4ADE8030] bg-[#4ADE8010] text-sm font-black tracking-wide text-[#4ADE80] transition active:scale-[0.97]"
@@ -166,6 +168,59 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
             インターバル追加
           </button>
         </div>
+
+        {/* Exercise picker */}
+        {isExercisePickerOpen && (
+          <section className="rounded-2xl border border-[#FF6B3530] bg-[#1E1E21] p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-xs font-black tracking-widest uppercase text-[#A0A0A5]">
+                種目を選択
+              </span>
+              <button
+                className="rounded-lg border border-[#3C3C42] px-3 py-1 text-xs font-bold text-[#A0A0A5] transition hover:text-[#F5F5F5]"
+                onClick={() => {
+                  setDraft(addItem(draft, 'workout'));
+                  setIsExercisePickerOpen(false);
+                }}
+              >
+                ＋ 空白で追加
+              </button>
+            </div>
+            <div className="grid gap-4">
+              {MUSCLE_GROUPS.map((group) => (
+                <div key={group.id}>
+                  <p className="m-0 mb-2 text-[0.65rem] font-black tracking-widest uppercase text-[#505058]">
+                    {group.label}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {group.exercises.map((ex) => (
+                      <button
+                        key={ex.id}
+                        type="button"
+                        className="rounded-xl border border-[#3C3C42] bg-[#2C2C30] px-3 py-1.5 text-sm font-bold text-[#A0A0A5] transition hover:border-[#FF6B3560] hover:text-[#FF6B35] active:scale-[0.95]"
+                        onClick={() => {
+                          setDraft((d) => {
+                            const next = addItem(d, 'workout');
+                            const added = next.items[next.items.length - 1];
+                            return {
+                              ...next,
+                              items: next.items.map((item) =>
+                                item.id === added.id ? { ...item, title: ex.name } : item
+                              ),
+                            };
+                          });
+                          setIsExercisePickerOpen(false);
+                        }}
+                      >
+                        {ex.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Bulk set form */}
         <section className="rounded-2xl border border-[#3C3C42] bg-[#2C2C30] p-3">

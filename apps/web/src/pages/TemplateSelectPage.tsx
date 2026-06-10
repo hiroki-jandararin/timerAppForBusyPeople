@@ -1,7 +1,7 @@
 import { ROUTINE_TEMPLATES, type RoutineTemplate } from '@timeapp/core';
 
 type Props = {
-  onSelect: (template: RoutineTemplate | null) => void;
+  onSelect: (template: RoutineTemplate) => void;
   onBack: () => void;
 };
 
@@ -73,14 +73,6 @@ export function TemplateSelectPage({ onSelect, onBack }: Props) {
         })}
       </section>
 
-      <div className="mt-4">
-        <button
-          className="min-h-12 w-full rounded-2xl border border-[#3C3C42] bg-[#2C2C30] font-bold text-[#A0A0A5] transition active:scale-[0.97]"
-          onClick={() => onSelect(null)}
-        >
-          最初から作る
-        </button>
-      </div>
     </main>
   );
 }

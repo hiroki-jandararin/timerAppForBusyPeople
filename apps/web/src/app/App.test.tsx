@@ -4,7 +4,15 @@ import { describe, expect, it } from 'vitest';
 import { AuthenticatedApp } from './App';
 import type { AuthService, AuthUser } from '@timeapp/core';
 import type { RoutineRepository } from '@timeapp/core';
-import type { Routine } from '@timeapp/core';
+import type { Routine, WorkoutHistory } from '@timeapp/core';
+
+const fakeHistoryRepository = {
+  create: async () => ({} as WorkoutHistory),
+  findAll: async () => [] as WorkoutHistory[],
+};
+const fakeGenerateAiRoutine = async (_prompt: string): Promise<Routine> => {
+  throw new Error('not implemented');
+};
 
 describe('App', () => {
   it('空状態から新規作成を開始しても保存するまではリストに出ない', async () => {
@@ -15,6 +23,8 @@ describe('App', () => {
       <AuthenticatedApp
         authService={createSignedInAuthService()}
         createRoutineRepository={() => repository}
+        historyRepository={fakeHistoryRepository}
+        generateAiRoutine={fakeGenerateAiRoutine}
       />,
     );
 
@@ -44,6 +54,8 @@ describe('App', () => {
       <AuthenticatedApp
         authService={createAuthService(null)}
         createRoutineRepository={() => new MemoryRoutineRepository()}
+        historyRepository={fakeHistoryRepository}
+        generateAiRoutine={fakeGenerateAiRoutine}
       />,
     );
 
