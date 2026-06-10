@@ -154,7 +154,7 @@ func (g *ClaudeGenerator) Generate(prompt string) (*GeneratedRoutine, error) {
 		Messages  []message `json:"messages"`
 	}
 	body, err := json.Marshal(requestBody{
-		Model:     "claude-haiku-4-5-20251001",
+		Model:     "claude-sonnet-4-6",
 		MaxTokens: 1024,
 		System:    systemPrompt,
 		Messages:  []message{{Role: "user", Content: prompt}},
