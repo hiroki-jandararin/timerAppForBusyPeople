@@ -24,7 +24,9 @@
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "*",
-    "@rollup/rollup-linux-x64-musl": "*"
+    "@rollup/rollup-linux-x64-musl": "*",
+    "lightningcss-linux-x64-gnu": "*",
+    "lightningcss-linux-x64-musl": "*"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
