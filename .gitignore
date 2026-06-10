@@ -6,6 +6,10 @@ dist/
 build/
 coverage/
 
+# Go / Lambda build artifacts
+bootstrap
+function.zip
+
 # Vite / TypeScript cache
 *.tsbuildinfo
 node_modules/.tmp/
