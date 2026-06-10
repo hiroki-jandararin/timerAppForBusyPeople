@@ -20,5 +20,6 @@
       "@timeapp/core": ["../../packages/core/src/index.ts"]
     }
   },
-  "include": ["src", "../../packages/core/src"]
+  "include": ["src", "../../packages/core/src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }
