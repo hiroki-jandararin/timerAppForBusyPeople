@@ -27,9 +27,13 @@ type Props = {
   existingRoutines: Routine[];
   onSave: (routine: Routine) => void | Promise<void>;
   onBack: () => void;
+  generateAiRoutine?: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
 };
 
-export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: Props) {
+const AI_BODY_PARTS = ['胸', '背中', '肩', '腕（前）', '腕（後ろ）', '足（前）', '足（後ろ）', '腹筋', '背筋', 'ふくらはぎ'] as const;
+const AI_DURATION_PRESETS = [10, 15, 20, 30, 45, 60] as const;
+
+export function RoutineEditPage({ routine, existingRoutines, onSave, onBack, generateAiRoutine }: Props) {
   const [draft, setDraft] = useState(routine);
   const [errors, setErrors] = useState<string[]>([]);
   const [targetMinutes, setTargetMinutes] = useState(() => {
@@ -38,6 +42,12 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
   });
   const [isExercisePickerOpen, setIsExercisePickerOpen] = useState(false);
   const [pickerReps, setPickerReps] = useState('10');
+  const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
+  const [aiParts, setAiParts] = useState<string[]>([]);
+  const [aiMinutes, setAiMinutes] = useState<number | null>(null);
+  const [aiExtra, setAiExtra] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [isSetFormOpen, setIsSetFormOpen] = useState(true);
   const [setTitle, setSetTitle] = useState('ワークアウト');
   const [setReps, setSetReps] = useState('10');
@@ -75,6 +85,25 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
         includeLastInterval,
       })
     );
+  }
+
+  async function handleAiAppend() {
+    if (!generateAiRoutine || !aiParts.length || !aiMinutes) return;
+    const prompt = `${aiParts.join('・')}を${aiMinutes}分で鍛えたい。${aiExtra.trim()}`;
+    setIsAiLoading(true);
+    setAiError(null);
+    try {
+      const generated = await generateAiRoutine(prompt, aiMinutes * 60);
+      setDraft((d) => ({ ...d, items: [...d.items, ...generated.items] }));
+      setIsAiPanelOpen(false);
+      setAiParts([]);
+      setAiMinutes(null);
+      setAiExtra('');
+    } catch {
+      setAiError('生成に失敗しました。もう一度お試しください。');
+    } finally {
+      setIsAiLoading(false);
+    }
   }
 
   function updateTargetDuration(value: string) {
@@ -161,7 +190,7 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
         <div className="grid grid-cols-2 gap-2">
           <button
             className="min-h-11 rounded-xl border border-[#FF6B3535] bg-[#FF6B3510] text-sm font-black tracking-wide text-[#FF6B35] transition active:scale-[0.97]"
-            onClick={() => setIsExercisePickerOpen((v) => !v)}
+            onClick={() => { setIsExercisePickerOpen((v) => !v); setIsAiPanelOpen(false); }}
           >
             {isExercisePickerOpen ? '種目選択を閉じる' : 'ワークアウト追加'}
           </button>
@@ -172,6 +201,14 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
             インターバル追加
           </button>
         </div>
+        {generateAiRoutine && (
+          <button
+            className="min-h-11 w-full rounded-xl border border-[#818CF830] bg-[#818CF810] text-sm font-black tracking-wide text-[#818CF8] transition active:scale-[0.97]"
+            onClick={() => { setIsAiPanelOpen((v) => !v); setIsExercisePickerOpen(false); }}
+          >
+            {isAiPanelOpen ? 'AIパネルを閉じる' : 'AIで追加'}
+          </button>
+        )}
 
         {/* Exercise picker */}
         {isExercisePickerOpen && (
@@ -237,6 +274,102 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+        )}
+
+        {/* AI panel */}
+        {isAiPanelOpen && generateAiRoutine && (
+          <section className="rounded-2xl border border-[#818CF830] bg-[#1E1E21] p-4">
+            <p className="m-0 mb-3 text-xs font-black tracking-widest uppercase text-[#818CF8]">
+              AIで追加
+            </p>
+
+            <div className="grid gap-4">
+              {/* 部位 */}
+              <div>
+                <p className="m-0 mb-2 text-xs font-black tracking-widest uppercase text-[#A0A0A5]">
+                  部位
+                  <span className="ml-2 text-[#505058] normal-case tracking-normal">複数選択可</span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {AI_BODY_PARTS.map((part) => {
+                    const selected = aiParts.includes(part);
+                    return (
+                      <button
+                        key={part}
+                        type="button"
+                        onClick={() =>
+                          setAiParts((prev) =>
+                            prev.includes(part) ? prev.filter((p) => p !== part) : [...prev, part]
+                          )
+                        }
+                        className="rounded-xl px-3 py-1.5 text-sm font-bold transition active:scale-[0.95]"
+                        style={
+                          selected
+                            ? { background: '#818CF8', color: '#F5F5F5' }
+                            : { background: '#2C2C30', color: '#A0A0A5', border: '1px solid #3C3C42' }
+                        }
+                      >
+                        {part}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 時間 */}
+              <div>
+                <p className="m-0 mb-2 text-xs font-black tracking-widest uppercase text-[#A0A0A5]">
+                  トータル時間
+                </p>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {AI_DURATION_PRESETS.map((min) => (
+                    <button
+                      key={min}
+                      type="button"
+                      onClick={() => setAiMinutes(min)}
+                      className="rounded-xl px-3 py-1.5 text-sm font-bold transition active:scale-[0.95]"
+                      style={
+                        aiMinutes === min
+                          ? { background: '#818CF8', color: '#F5F5F5' }
+                          : { background: '#2C2C30', color: '#A0A0A5', border: '1px solid #3C3C42' }
+                      }
+                    >
+                      {min}分
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 追加リクエスト */}
+              <textarea
+                className="w-full resize-none rounded-xl border border-[#3C3C42] bg-[#2C2C30] p-3 text-sm text-[#F5F5F5] placeholder-[#505058] outline-none transition focus:border-[#818CF860]"
+                rows={2}
+                placeholder="追加リクエスト（任意）例: 初心者向け"
+                value={aiExtra}
+                onChange={(e) => setAiExtra(e.target.value)}
+                disabled={isAiLoading}
+              />
+
+              {aiError && (
+                <p className="m-0 text-xs font-bold text-[#EF4444]">{aiError}</p>
+              )}
+
+              <button
+                type="button"
+                className="min-h-11 w-full rounded-xl text-sm font-black text-[#F5F5F5] transition active:scale-[0.97] disabled:opacity-40"
+                style={{
+                  background:
+                    isAiLoading || !aiParts.length || !aiMinutes
+                      ? 'linear-gradient(135deg, #505058, #3C3C42)'
+                      : 'linear-gradient(135deg, #818CF8, #A78BFA)',
+                }}
+                onClick={handleAiAppend}
+                disabled={isAiLoading || !aiParts.length || !aiMinutes}
+              >
+                {isAiLoading ? '生成中...' : '生成して追加'}
+              </button>
             </div>
           </section>
         )}

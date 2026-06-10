@@ -72,7 +72,7 @@ export function AppRoutes({
         />
         <Route
           path="/routines/:routineId/edit"
-          element={<EditRoute isLoaded={isLoaded} routines={routines} onSave={onSave} />}
+          element={<EditRoute isLoaded={isLoaded} routines={routines} onSave={onSave} generateAiRoutine={generateAiRoutine} />}
         />
         <Route
           path="/routines/:routineId/timer"
@@ -204,9 +204,10 @@ type EditRouteProps = {
   isLoaded: boolean;
   routines: Routine[];
   onSave: (routine: Routine) => Promise<void>;
+  generateAiRoutine: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
 };
 
-function EditRoute({ isLoaded, routines, onSave }: EditRouteProps) {
+function EditRoute({ isLoaded, routines, onSave, generateAiRoutine }: EditRouteProps) {
   const navigate = useNavigate();
   const { routineId } = useParams();
 
@@ -228,6 +229,7 @@ function EditRoute({ isLoaded, routines, onSave }: EditRouteProps) {
         navigate('/');
       }}
       onBack={() => navigate('/')}
+      generateAiRoutine={generateAiRoutine}
     />
   );
 }
