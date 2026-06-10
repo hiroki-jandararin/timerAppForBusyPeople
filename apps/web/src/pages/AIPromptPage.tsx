@@ -22,17 +22,9 @@ const BODY_PARTS = [
 
 const DURATION_PRESETS = [10, 15, 20, 30, 45, 60] as const;
 
-const INTERVALS = [
-  { label: '短め', description: '約15秒' },
-  { label: '普通', description: '約30秒' },
-  { label: '長め', description: '約60秒' },
-] as const;
-
-type Interval = (typeof INTERVALS)[number]['label'];
-
-function buildPrompt(parts: string[], minutes: number, interval: Interval, extra: string): string {
+function buildPrompt(parts: string[], minutes: number, extra: string): string {
   const partStr = parts.join('・');
-  let prompt = `${partStr}を${minutes}分で鍛えたい。インターバルは${interval}。`;
+  let prompt = `${partStr}を${minutes}分で鍛えたい。`;
   if (extra.trim()) prompt += ` ${extra.trim()}`;
   return prompt;
 }
@@ -40,7 +32,6 @@ function buildPrompt(parts: string[], minutes: number, interval: Interval, extra
 export function AIPromptPage({ onGenerate, onBack, generateAiRoutine }: Props) {
   const [selectedParts, setSelectedParts] = useState<string[]>([]);
   const [selectedMinutes, setSelectedMinutes] = useState<number | null>(null);
-  const [selectedInterval, setSelectedInterval] = useState<Interval | null>(null);
   const [extra, setExtra] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,8 +43,7 @@ export function AIPromptPage({ onGenerate, onBack, generateAiRoutine }: Props) {
     selectedParts.length > 0 &&
     selectedMinutes !== null &&
     selectedMinutes >= 1 &&
-    !minutesError &&
-    selectedInterval !== null;
+    !minutesError;
 
   function togglePart(part: string) {
     setSelectedParts((prev) =>
@@ -63,7 +53,7 @@ export function AIPromptPage({ onGenerate, onBack, generateAiRoutine }: Props) {
 
   async function handleGenerate() {
     if (!canGenerate) return;
-    const prompt = buildPrompt(selectedParts, selectedMinutes!, selectedInterval!, extra);
+    const prompt = buildPrompt(selectedParts, selectedMinutes!, extra);
     setIsLoading(true);
     setError(null);
     try {
@@ -190,34 +180,6 @@ export function AIPromptPage({ onGenerate, onBack, generateAiRoutine }: Props) {
           )}
         </section>
 
-        {/* インターバル */}
-        <section className="rounded-2xl border border-[#3C3C42] bg-[#1E1E21] p-4">
-          <h2 className="m-0 mb-3 text-xs font-black tracking-widest uppercase text-[#A0A0A5]">
-            インターバル（休憩）
-          </h2>
-          <div className="grid grid-cols-3 gap-2">
-            {INTERVALS.map(({ label, description }) => {
-              const selected = selectedInterval === label;
-              return (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => setSelectedInterval(label)}
-                  className="rounded-xl p-3 text-center transition active:scale-[0.95]"
-                  style={
-                    selected
-                      ? { background: '#FF6B3520', border: '1px solid #FF6B35', color: '#FF6B35' }
-                      : { background: '#2C2C30', border: '1px solid #3C3C42', color: '#A0A0A5' }
-                  }
-                >
-                  <p className="m-0 text-sm font-black">{label}</p>
-                  <p className="m-0 mt-0.5 text-[0.6rem] opacity-60">{description}</p>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
         {/* 追加リクエスト（任意） */}
         <section className="rounded-2xl border border-[#3C3C42] bg-[#1E1E21] p-4">
           <h2 className="m-0 mb-3 text-xs font-black tracking-widest uppercase text-[#A0A0A5]">
@@ -241,7 +203,7 @@ export function AIPromptPage({ onGenerate, onBack, generateAiRoutine }: Props) {
               生成するプロンプト
             </p>
             <p className="m-0 mt-1 text-sm text-[#A0A0A5]">
-              {buildPrompt(selectedParts, selectedMinutes!, selectedInterval!, extra)}
+              {buildPrompt(selectedParts, selectedMinutes!, extra)}
             </p>
           </div>
         )}
