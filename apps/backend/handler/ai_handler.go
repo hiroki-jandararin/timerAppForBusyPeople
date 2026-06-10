@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -105,12 +106,15 @@ func (h *AIHandler) GenerateRoutine(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var req struct {
-		Prompt string `json:"prompt"`
+		Prompt    string `json:"prompt"`
+		TargetSec int    `json:"targetSec"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Prompt) == "" {
 		http.Error(w, "プロンプトが必要です", http.StatusBadRequest)
 		return
 	}
+
+	slog.Info("ルーティン生成開始", "prompt", req.Prompt, "targetSec", req.TargetSec)
 
 	generated, err := h.generator.Generate(req.Prompt)
 	if err != nil {
@@ -119,7 +123,46 @@ func (h *AIHandler) GenerateRoutine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if firstJSON, err := json.Marshal(generated); err == nil {
+		slog.Info("1回目生成結果", "routine", string(firstJSON))
+	}
+
+	if req.TargetSec > 0 {
+		actual := totalDuration(generated)
+		diff := actual - req.TargetSec
+		if diff < 0 {
+			diff = -diff
+		}
+		slog.Info("時間チェック", "actualSec", actual, "targetSec", req.TargetSec, "diffSec", diff, "willRetry", diff > 180)
+		if diff > 180 {
+			retryPrompt := req.Prompt
+			if prevJSON, err := json.Marshal(generated); err == nil {
+				retryPrompt = fmt.Sprintf(
+					"%s\n\n[前回の生成結果: %s\n前回の生成結果の合計時間は%d秒でした。目標は%d秒です。合計時間が%d秒に近くなるよう調整して再生成してください]",
+					req.Prompt, string(prevJSON), actual, req.TargetSec, req.TargetSec,
+				)
+			}
+			slog.Info("リトライプロンプト", "prompt", retryPrompt)
+			if retried, err := h.generator.Generate(retryPrompt); err == nil {
+				if retryJSON, err := json.Marshal(retried); err == nil {
+					slog.Info("リトライ結果", "routine", string(retryJSON), "retrySec", totalDuration(retried))
+				}
+				generated = retried
+			}
+		}
+	} else {
+		slog.Info("targetSec未指定のためリトライスキップ")
+	}
+
 	json.NewEncoder(w).Encode(generated)
+}
+
+func totalDuration(r *GeneratedRoutine) int {
+	total := 0
+	for _, item := range r.Items {
+		total += item.DurationSec
+	}
+	return total
 }
 
 // --- ClaudeGenerator ---
@@ -154,7 +197,7 @@ func (g *ClaudeGenerator) Generate(prompt string) (*GeneratedRoutine, error) {
 		Messages  []message `json:"messages"`
 	}
 	body, err := json.Marshal(requestBody{
-		Model:     "claude-sonnet-4-6",
+		Model:     "claude-haiku-4-5-20251001",
 		MaxTokens: 1024,
 		System:    systemPrompt,
 		Messages:  []message{{Role: "user", Content: prompt}},

@@ -82,6 +82,168 @@ func TestGenerateRoutine_Success(t *testing.T) {
 	assert.GreaterOrEqual(t, len(result["items"].([]any)), 6)
 }
 
+// モック（複数呼び出し対応）
+type mockGeneratorSeq struct {
+	results []*handler.GeneratedRoutine
+	errors  []error
+	calls   int
+	prompts []string
+}
+
+func (m *mockGeneratorSeq) Generate(prompt string) (*handler.GeneratedRoutine, error) {
+	m.prompts = append(m.prompts, prompt)
+	i := m.calls
+	m.calls++
+	if i < len(m.results) {
+		return m.results[i], m.errors[i]
+	}
+	return nil, errors.New("予期しない Generate 呼び出し")
+}
+
+// ケース6: targetSecより大幅にズレていたらリトライする
+func TestGenerateRoutine_RetriesWhenTotalTimeIsOff(t *testing.T) {
+	shortRoutine := &handler.GeneratedRoutine{
+		Name: "胸トレ",
+		Items: []handler.GeneratedRoutineItem{
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+		}, // 合計480秒
+	}
+	correctRoutine := &handler.GeneratedRoutine{
+		Name: "胸トレ",
+		Items: []handler.GeneratedRoutineItem{
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+		}, // 合計900秒
+	}
+	mock := &mockGeneratorSeq{
+		results: []*handler.GeneratedRoutine{shortRoutine, correctRoutine},
+		errors:  []error{nil, nil},
+	}
+	h := handler.NewAIHandlerWithGenerator(mock)
+	body := `{"prompt":"胸を15分鍛えたい","targetSec":900}`
+	req := httptest.NewRequest(http.MethodPost, "/ai/generate-routine", bytes.NewBufferString(body))
+	req = req.WithContext(middleware.WithUserID(context.Background(), "user-1"))
+	rr := httptest.NewRecorder()
+
+	h.GenerateRoutine(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, 2, mock.calls)
+	assert.Contains(t, mock.prompts[1], "480")
+	assert.Contains(t, mock.prompts[1], "900")
+	assert.Contains(t, mock.prompts[1], `"items"`) // 前回の生成結果JSONが含まれること
+}
+
+// ケース7: 差が180秒以内ならリトライしない（境界値）
+func TestGenerateRoutine_NoRetryWithin180Seconds(t *testing.T) {
+	// targetSec=900, 合計=720 → 差180秒 → リトライなし
+	routine := &handler.GeneratedRoutine{
+		Name: "胸トレ",
+		Items: []handler.GeneratedRoutineItem{
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+		}, // 合計720秒（4*120 + 4*60 = 720、差180秒）
+	}
+	mock := &mockGeneratorSeq{
+		results: []*handler.GeneratedRoutine{routine},
+		errors:  []error{nil},
+	}
+	h := handler.NewAIHandlerWithGenerator(mock)
+	body := `{"prompt":"胸を15分鍛えたい","targetSec":900}`
+	req := httptest.NewRequest(http.MethodPost, "/ai/generate-routine", bytes.NewBufferString(body))
+	req = req.WithContext(middleware.WithUserID(context.Background(), "user-1"))
+	rr := httptest.NewRecorder()
+
+	h.GenerateRoutine(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, 1, mock.calls)
+}
+
+// ケース8: 差が181秒ならリトライする（境界値+1）
+func TestGenerateRoutine_RetriesWhen181SecondsOff(t *testing.T) {
+	// targetSec=900, 合計=719 → 差181秒 → リトライ
+	offRoutine := &handler.GeneratedRoutine{
+		Name: "胸トレ",
+		Items: []handler.GeneratedRoutineItem{
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 59},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+		}, // 合計719秒（差181秒）
+	}
+	retryRoutine := &handler.GeneratedRoutine{
+		Name:  "胸トレ",
+		Items: []handler.GeneratedRoutineItem{{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 900}},
+	}
+	mock := &mockGeneratorSeq{
+		results: []*handler.GeneratedRoutine{offRoutine, retryRoutine},
+		errors:  []error{nil, nil},
+	}
+	h := handler.NewAIHandlerWithGenerator(mock)
+	body := `{"prompt":"胸を15分鍛えたい","targetSec":900}`
+	req := httptest.NewRequest(http.MethodPost, "/ai/generate-routine", bytes.NewBufferString(body))
+	req = req.WithContext(middleware.WithUserID(context.Background(), "user-1"))
+	rr := httptest.NewRecorder()
+
+	h.GenerateRoutine(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, 2, mock.calls)
+}
+
+// ケース9: targetSecに完全一致でもリトライしない
+func TestGenerateRoutine_NoRetryWhenTotalTimeIsClose(t *testing.T) {
+	routine := &handler.GeneratedRoutine{
+		Name: "胸トレ",
+		Items: []handler.GeneratedRoutineItem{
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+			{Title: "休憩", Type: "interval", DurationSec: 60},
+			{Title: "ベンチプレス 25回", Type: "workout", DurationSec: 120},
+		}, // 合計900秒
+	}
+	mock := &mockGeneratorSeq{
+		results: []*handler.GeneratedRoutine{routine},
+		errors:  []error{nil},
+	}
+	h := handler.NewAIHandlerWithGenerator(mock)
+	body := `{"prompt":"胸を15分鍛えたい","targetSec":900}`
+	req := httptest.NewRequest(http.MethodPost, "/ai/generate-routine", bytes.NewBufferString(body))
+	req = req.WithContext(middleware.WithUserID(context.Background(), "user-1"))
+	rr := httptest.NewRecorder()
+
+	h.GenerateRoutine(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, 1, mock.calls)
+}
+
 // --- ClaudeGenerator のテスト ---
 
 // ケース4: ANTHROPIC_API_KEY が未設定なら Generate がエラーを返す

@@ -40,10 +40,7 @@ export function AIPromptPage({ onGenerate, onBack, generateAiRoutine }: Props) {
     selectedMinutes !== null && selectedMinutes > 120 ? '120分（2時間）を超えています' : null;
 
   const canGenerate =
-    selectedParts.length > 0 &&
-    selectedMinutes !== null &&
-    selectedMinutes >= 1 &&
-    !minutesError;
+    selectedParts.length > 0 && selectedMinutes !== null && selectedMinutes >= 1 && !minutesError;
 
   function togglePart(part: string) {
     setSelectedParts((prev) =>
@@ -68,6 +65,14 @@ export function AIPromptPage({ onGenerate, onBack, generateAiRoutine }: Props) {
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-lg p-4 sm:p-5">
+      {isLoading && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0F0F11]/85">
+          <div className="h-12 w-12 animate-spin rounded-full border-[3px] border-[#3C3C42] border-t-[#FF6B35]" />
+          <p className="mt-4 text-sm font-bold tracking-widest text-[#A0A0A5]">
+            筋トレメニュー生成中...
+          </p>
+        </div>
+      )}
       <header className="mb-6">
         <button
           className="text-sm font-bold tracking-widest text-[#A0A0A5] uppercase transition hover:text-[#F5F5F5]"

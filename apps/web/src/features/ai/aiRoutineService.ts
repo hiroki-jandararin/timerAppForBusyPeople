@@ -26,7 +26,7 @@ export async function generateAiRoutine(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt, targetSec: targetDurationSec }),
   });
 
   if (!res.ok) throw new Error(`ルーティンの生成に失敗しました: ${res.status}`);
