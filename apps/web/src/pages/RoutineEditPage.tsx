@@ -37,8 +37,10 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
     return targetDuration === null ? '' : String(Math.floor(targetDuration / 60));
   });
   const [isExercisePickerOpen, setIsExercisePickerOpen] = useState(false);
+  const [pickerReps, setPickerReps] = useState('10');
   const [isSetFormOpen, setIsSetFormOpen] = useState(true);
   const [setTitle, setSetTitle] = useState('ワークアウト');
+  const [setReps, setSetReps] = useState('10');
   const [setWorkoutDurationSec, setSetWorkoutDurationSec] = useState('60');
   const [setIntervalDurationSec, setSetIntervalDurationSec] = useState('90');
   const [setCount, setSetCount] = useState('3');
@@ -62,9 +64,11 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
   }
 
   function addSet() {
+    const reps = Number(setReps);
+    const title = reps > 0 ? `${setTitle} ${reps}回` : setTitle;
     setDraft((current) =>
       addWorkoutSet(current, {
-        title: setTitle,
+        title,
         workoutDurationSec: Number(setWorkoutDurationSec),
         intervalDurationSec: Number(setIntervalDurationSec),
         setCount: Number(setCount),
@@ -172,10 +176,23 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
         {/* Exercise picker */}
         {isExercisePickerOpen && (
           <section className="rounded-2xl border border-[#FF6B3530] bg-[#1E1E21] p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-black tracking-widest uppercase text-[#A0A0A5]">
-                種目を選択
-              </span>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black tracking-widest uppercase text-[#A0A0A5]">
+                  種目を選択
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    value={pickerReps}
+                    onChange={(e) => setPickerReps(e.target.value)}
+                    className="w-14 rounded-lg border border-[#3C3C42] bg-[#2C2C30] px-2 py-1 text-center text-sm font-bold text-[#F5F5F5] outline-none focus:border-[#FF6B35]"
+                  />
+                  <span className="text-xs font-bold text-[#505058]">回</span>
+                </div>
+              </div>
               <button
                 className="rounded-lg border border-[#3C3C42] px-3 py-1 text-xs font-bold text-[#A0A0A5] transition hover:text-[#F5F5F5]"
                 onClick={() => {
@@ -199,13 +216,15 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
                         type="button"
                         className="rounded-xl border border-[#3C3C42] bg-[#2C2C30] px-3 py-1.5 text-sm font-bold text-[#A0A0A5] transition hover:border-[#FF6B3560] hover:text-[#FF6B35] active:scale-[0.95]"
                         onClick={() => {
+                          const reps = Number(pickerReps);
+                          const title = reps > 0 ? `${ex.name} ${reps}回` : ex.name;
                           setDraft((d) => {
                             const next = addItem(d, 'workout');
                             const added = next.items[next.items.length - 1];
                             return {
                               ...next,
                               items: next.items.map((item) =>
-                                item.id === added.id ? { ...item, title: ex.name } : item
+                                item.id === added.id ? { ...item, title } : item
                               ),
                             };
                           });
@@ -238,15 +257,29 @@ export function RoutineEditPage({ routine, existingRoutines, onSave, onBack }: P
 
           {isSetFormOpen && (
             <div className="grid gap-3 border-t border-[#3C3C42] pt-3">
-              <label className={labelClass}>
-                種目名
-                <input
-                  className={inputClass}
-                  value={setTitle}
-                  onChange={(event) => setSetTitle(event.target.value)}
-                  placeholder="スクワット"
-                />
-              </label>
+              <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+                <label className={labelClass}>
+                  種目名
+                  <input
+                    className={inputClass}
+                    value={setTitle}
+                    onChange={(event) => setSetTitle(event.target.value)}
+                    placeholder="スクワット"
+                  />
+                </label>
+                <label className={labelClass}>
+                  回数
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    value={setReps}
+                    onChange={(event) => setSetReps(event.target.value)}
+                    style={{ width: '5rem' }}
+                  />
+                </label>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <label className={labelClass}>
                   ワークアウト秒数

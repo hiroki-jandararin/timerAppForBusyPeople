@@ -2,6 +2,16 @@ import { useState } from 'react';
 import { DurationPresetSelect } from './DurationPresetSelect';
 import type { RoutineItem } from '@timeapp/core';
 
+function parseReps(title: string): number | null {
+  const m = title.match(/\s+(\d+)回$/);
+  return m ? Number(m[1]) : null;
+}
+
+function setRepsInTitle(title: string, reps: number | null): string {
+  const base = title.replace(/\s+\d+回$/, '').trimEnd();
+  return reps != null && reps > 0 ? `${base} ${reps}回` : base;
+}
+
 type Props = {
   item: RoutineItem;
   index: number;
@@ -31,6 +41,9 @@ export function RoutineItemCard({
       ? 'focus:border-[#4ADE80] focus:ring-[#4ADE80]/15'
       : 'focus:border-[#FF6B35] focus:ring-[#FF6B35]/15');
   const labelClass = 'grid gap-1.5 text-xs font-black tracking-[0.12em] uppercase text-[#A0A0A5]';
+
+  const reps = parseReps(item.title);
+  const baseName = item.title.replace(/\s+\d+回$/, '').trimEnd();
 
   return (
     <article
@@ -106,13 +119,30 @@ export function RoutineItemCard({
       {isOpen && (
         <div className="grid gap-2 border-t border-[#3C3C42] pt-2">
           <label className={labelClass}>
-            カード名
+            種目名
             <input
               className={inputClass}
-              value={item.title}
-              onChange={(event) => onChange({ title: event.target.value })}
+              value={baseName}
+              onChange={(e) => onChange({ title: setRepsInTitle(e.target.value, reps) })}
             />
           </label>
+          {!isInterval && (
+            <label className={labelClass}>
+              回数
+              <input
+                className={inputClass}
+                type="number"
+                min="1"
+                inputMode="numeric"
+                value={reps ?? ''}
+                placeholder="10"
+                onChange={(e) => {
+                  const val = e.target.value === '' ? null : Number(e.target.value);
+                  onChange({ title: setRepsInTitle(baseName, val) });
+                }}
+              />
+            </label>
+          )}
           <label className={labelClass}>
             秒数
             <DurationPresetSelect
