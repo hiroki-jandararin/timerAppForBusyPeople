@@ -196,6 +196,13 @@ describe('TimerPage', () => {
     );
 
     await user.click(screen.getByRole('button', { name: '開始' }));
+
+    // QUEUEの現在グループ行をタップして後回しボタンを出す
+    const queue = screen.getByRole('region', { name: '現在の位置' });
+    const currentRow = Array.from(queue.querySelectorAll('[data-group]')).find((el) =>
+      el.textContent?.includes('スクワット'),
+    );
+    await user.click(currentRow as Element);
     await user.click(screen.getByRole('button', { name: '後回し' }));
     await user.click(screen.getByRole('button', { name: '後回しにする' }));
 
@@ -203,7 +210,6 @@ describe('TimerPage', () => {
     expect(screen.getAllByText('ベンチプレス').length).toBeGreaterThan(0);
 
     // QUEUEでスクワットが最後のグループになっている
-    const queue = screen.getByRole('region', { name: '現在の位置' });
     const groups = Array.from(queue.querySelectorAll('[data-group]'));
     expect(groups[groups.length - 1]?.textContent).toContain('スクワット');
   });
@@ -250,6 +256,7 @@ describe('TimerPage', () => {
     );
     await user.click(kenkuRow as Element);
     await user.click(screen.getByRole('button', { name: '次にやる' }));
+    await user.click(screen.getByRole('button', { name: '次にやる' })); // 確認ダイアログで確定
 
     // QUEUEの2番目グループが懸垂になっている
     const updatedGroups = Array.from(

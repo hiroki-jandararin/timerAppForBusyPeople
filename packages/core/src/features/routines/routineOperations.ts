@@ -222,7 +222,11 @@ function moveItem(routine: Routine, from: number, to: number): Routine {
 }
 
 export function getBaseTitle(title: string): string {
-  return title.replace(/\s+\d+$/, '').trim();
+  let base = title.trim();
+  base = base.replace(/\s+\d+回$/, '');   // "スクワット 10回" → "スクワット"
+  base = base.replace(/\s+\d+$/, '');     // "スクワット 1" → "スクワット"
+  base = base.replace(/（[^）]*）$/, ''); // "ダンベルカール（右）" → "ダンベルカール"
+  return base.trim();
 }
 
 export function getExerciseGroupRange(
@@ -247,23 +251,45 @@ export function getExerciseGroupRange(
   const base = getBaseTitle(items[workoutIndex].title);
 
   let start = workoutIndex;
-  while (
-    start >= 2 &&
-    items[start - 1]?.type === 'interval' &&
-    items[start - 2]?.type === 'workout' &&
-    getBaseTitle(items[start - 2].title) === base
-  ) {
-    start -= 2;
+  while (start > 0) {
+    if (
+      items[start - 1]?.type === 'workout' &&
+      getBaseTitle(items[start - 1].title) === base
+    ) {
+      // W-W 連続（ペア種目など）
+      start -= 1;
+    } else if (
+      start >= 2 &&
+      items[start - 1]?.type === 'interval' &&
+      items[start - 2]?.type === 'workout' &&
+      getBaseTitle(items[start - 2].title) === base
+    ) {
+      // W-I-W パターン
+      start -= 2;
+    } else {
+      break;
+    }
   }
 
   let end = workoutIndex;
-  while (
-    end + 2 < items.length &&
-    items[end + 1]?.type === 'interval' &&
-    items[end + 2]?.type === 'workout' &&
-    getBaseTitle(items[end + 2].title) === base
-  ) {
-    end += 2;
+  while (end + 1 < items.length) {
+    if (
+      items[end + 1]?.type === 'workout' &&
+      getBaseTitle(items[end + 1].title) === base
+    ) {
+      // W-W 連続（ペア種目など）
+      end += 1;
+    } else if (
+      end + 2 < items.length &&
+      items[end + 1]?.type === 'interval' &&
+      items[end + 2]?.type === 'workout' &&
+      getBaseTitle(items[end + 2].title) === base
+    ) {
+      // W-I-W パターン
+      end += 2;
+    } else {
+      break;
+    }
   }
 
   if (end + 1 < items.length && items[end + 1]?.type === 'interval') {

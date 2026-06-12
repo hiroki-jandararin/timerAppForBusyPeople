@@ -39,6 +39,21 @@ describe('getBaseTitle', () => {
   it('末尾以外の数字は除去しない', () => {
     expect(getBaseTitle('3RM スクワット')).toBe('3RM スクワット');
   });
+
+  it('末尾の（右）（左）を除去する', () => {
+    expect(getBaseTitle('ダンベルカール（右）')).toBe('ダンベルカール');
+    expect(getBaseTitle('ダンベルカール（左）')).toBe('ダンベルカール');
+  });
+
+  it('末尾の（右）（左）＋セット番号を除去する', () => {
+    expect(getBaseTitle('ダンベルカール（右） 1')).toBe('ダンベルカール');
+    expect(getBaseTitle('ダンベルカール（左） 2')).toBe('ダンベルカール');
+  });
+
+  it('末尾の N回 を除去する', () => {
+    expect(getBaseTitle('スクワット 10回')).toBe('スクワット');
+    expect(getBaseTitle('ダンベルカール（右） 10回')).toBe('ダンベルカール');
+  });
 });
 
 // ─── getExerciseGroupRange ─────────────────────────────────────────────────────
@@ -110,6 +125,37 @@ describe('getExerciseGroupRange', () => {
     const fromThird = getExerciseGroupRange(routine.items, 4);
     expect(fromFirst).toEqual(fromSecond);
     expect(fromSecond).toEqual(fromThird);
+  });
+
+  it('W-W-I パターン（旧データ、groupId なし）：ペア種目が1グループになる', () => {
+    // AI生成の旧データ想定: groupId なし、（右）/（左）が連続
+    const routine = makeRoutine([
+      { type: 'workout', title: 'ダンベルカール（右） 10回' },
+      { type: 'workout', title: 'ダンベルカール（左） 10回' },
+      { type: 'interval', title: '休憩' },
+      { type: 'workout', title: 'ダンベルカール（右） 10回' },
+      { type: 'workout', title: 'ダンベルカール（左） 10回' },
+      { type: 'interval', title: '休憩' },  // 種目間
+      { type: 'workout', title: 'ベンチプレス 10回' },
+    ]);
+    // （右）から取得
+    expect(getExerciseGroupRange(routine.items, 0)).toEqual({ start: 0, end: 5 });
+    // （左）から取得しても同じ範囲
+    expect(getExerciseGroupRange(routine.items, 1)).toEqual({ start: 0, end: 5 });
+    // 2セット目の（右）からも同じ
+    expect(getExerciseGroupRange(routine.items, 3)).toEqual({ start: 0, end: 5 });
+  });
+
+  it('W-W-I パターン（末尾の種目間休憩なし）でも正しい範囲を返す', () => {
+    const routine = makeRoutine([
+      { type: 'workout', title: 'ダンベルカール（右） 10回' },
+      { type: 'workout', title: 'ダンベルカール（左） 10回' },
+      { type: 'interval', title: '休憩' },
+      { type: 'workout', title: 'ダンベルカール（右） 10回' },
+      { type: 'workout', title: 'ダンベルカール（左） 10回' },
+    ]);
+    expect(getExerciseGroupRange(routine.items, 0)).toEqual({ start: 0, end: 4 });
+    expect(getExerciseGroupRange(routine.items, 4)).toEqual({ start: 0, end: 4 });
   });
 });
 

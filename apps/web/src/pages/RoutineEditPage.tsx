@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { RoutineItemCard } from '../components/RoutineItemCard';
 import {
   addItem,
+  addPairedWorkoutSet,
   addWorkoutSet,
   deleteItem,
   duplicateItem,
@@ -72,6 +73,7 @@ export function RoutineEditPage({
   const [setIntervalDurationSec, setSetIntervalDurationSec] = useState('90');
   const [setCount, setSetCount] = useState('3');
   const [includeLastInterval, setIncludeLastInterval] = useState(false);
+  const [isPairedMode, setIsPairedMode] = useState(false);
 
   const totalDuration = calculateTotalDuration(draft);
   const targetDifference = calculateTargetDifference(draft);
@@ -93,15 +95,27 @@ export function RoutineEditPage({
   function addSet() {
     const reps = Number(setReps);
     const title = reps > 0 ? `${setTitle} ${reps}回` : setTitle;
-    setDraft((current) =>
-      addWorkoutSet(current, {
-        title,
-        workoutDurationSec: Number(setWorkoutDurationSec),
-        intervalDurationSec: Number(setIntervalDurationSec),
-        setCount: Number(setCount),
-        includeLastInterval,
-      })
-    );
+    if (isPairedMode) {
+      setDraft((current) =>
+        addPairedWorkoutSet(current, {
+          title,
+          workoutDurationSec: Number(setWorkoutDurationSec),
+          intervalDurationSec: Number(setIntervalDurationSec),
+          setCount: Number(setCount),
+          includeLastInterval,
+        })
+      );
+    } else {
+      setDraft((current) =>
+        addWorkoutSet(current, {
+          title,
+          workoutDurationSec: Number(setWorkoutDurationSec),
+          intervalDurationSec: Number(setIntervalDurationSec),
+          setCount: Number(setCount),
+          includeLastInterval,
+        })
+      );
+    }
   }
 
   async function handleAiAppend() {
@@ -486,6 +500,15 @@ export function RoutineEditPage({
                   最後も休憩
                 </label>
               </div>
+              <label className="flex min-h-11 items-center gap-2 text-xs font-black tracking-wide text-[#A0A0A5] uppercase">
+                <input
+                  type="checkbox"
+                  checked={isPairedMode}
+                  onChange={(event) => setIsPairedMode(event.target.checked)}
+                  className="accent-[#FF6B35]"
+                />
+                ペア種目（右/左）
+              </label>
               <button
                 type="button"
                 className="min-h-11 w-full rounded-xl bg-[#FF6B35] text-sm font-black tracking-wide text-[#F5F5F5] shadow-lg shadow-[#FF6B35]/15 transition active:scale-[0.97]"

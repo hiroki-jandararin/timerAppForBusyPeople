@@ -97,7 +97,29 @@ describe('TimerDisplay', () => {
     expect(queue).not.toHaveTextContent('スクワット 2');
   });
 
-  it('現在のworkout種目のとき後回しボタンが表示される', () => {
+  it('タイマー開始前（idle）でも現在グループをタップすると後回しボタンが表示される', async () => {
+    const user = userEvent.setup();
+    const routine = createGroupedRoutine();
+
+    render(
+      <TimerDisplay
+        {...defaultProps}
+        routine={routine}
+        state={{ ...initialTimerState, status: 'idle', currentIndex: 0 }}
+      />,
+    );
+
+    const queue = screen.getByRole('region', { name: '現在の位置' });
+    const currentRow = Array.from(queue.querySelectorAll('[data-group]')).find((el) =>
+      el.textContent?.includes('スクワット'),
+    );
+    await user.click(currentRow as Element);
+
+    expect(screen.getByRole('button', { name: '後回し' })).toBeInTheDocument();
+  });
+
+  it('現在のworkout種目のとき QUEUEの現在グループをタップすると後回しボタンが表示される', async () => {
+    const user = userEvent.setup();
     const routine = createGroupedRoutine();
 
     render(
@@ -108,10 +130,21 @@ describe('TimerDisplay', () => {
       />,
     );
 
+    // タップ前は表示されない
+    expect(screen.queryByRole('button', { name: '後回し' })).not.toBeInTheDocument();
+
+    // 現在グループ行をタップ
+    const queue = screen.getByRole('region', { name: '現在の位置' });
+    const currentRow = Array.from(queue.querySelectorAll('[data-group]')).find((el) =>
+      el.textContent?.includes('スクワット'),
+    );
+    await user.click(currentRow as Element);
+
     expect(screen.getByRole('button', { name: '後回し' })).toBeInTheDocument();
   });
 
-  it('現在が休憩（interval）のとき後回しボタンが表示されない', () => {
+  it('現在が休憩（interval）のとき現在グループをタップしても後回しボタンが表示されない', async () => {
+    const user = userEvent.setup();
     const routine = createGroupedRoutine();
     // index 1 は休憩
     render(
@@ -122,10 +155,16 @@ describe('TimerDisplay', () => {
       />,
     );
 
+    const queue = screen.getByRole('region', { name: '現在の位置' });
+    const currentRow = Array.from(queue.querySelectorAll('[data-group]')).find((el) =>
+      el.textContent?.includes('スクワット'),
+    );
+    if (currentRow) await user.click(currentRow as Element);
+
     expect(screen.queryByRole('button', { name: '後回し' })).not.toBeInTheDocument();
   });
 
-  it('後回しボタンを押すと確認ダイアログが表示され onDefer はまだ呼ばれない', async () => {
+  it('QUEUEの現在グループをタップして後回しボタンを押すと確認ダイアログが表示され onDefer はまだ呼ばれない', async () => {
     const user = userEvent.setup();
     const onDefer = vi.fn();
     const routine = createGroupedRoutine();
@@ -139,6 +178,11 @@ describe('TimerDisplay', () => {
       />,
     );
 
+    const queue = screen.getByRole('region', { name: '現在の位置' });
+    const currentRow = Array.from(queue.querySelectorAll('[data-group]')).find((el) =>
+      el.textContent?.includes('スクワット'),
+    );
+    await user.click(currentRow as Element);
     await user.click(screen.getByRole('button', { name: '後回し' }));
     expect(screen.getByRole('dialog', { name: '後回しにしますか？' })).toBeInTheDocument();
     expect(onDefer).not.toHaveBeenCalled();
@@ -158,6 +202,11 @@ describe('TimerDisplay', () => {
       />,
     );
 
+    const queue = screen.getByRole('region', { name: '現在の位置' });
+    const currentRow = Array.from(queue.querySelectorAll('[data-group]')).find((el) =>
+      el.textContent?.includes('スクワット'),
+    );
+    await user.click(currentRow as Element);
     await user.click(screen.getByRole('button', { name: '後回し' }));
     await user.click(screen.getByRole('button', { name: '後回しにする' }));
     expect(onDefer).toHaveBeenCalledOnce();
@@ -184,6 +233,31 @@ describe('TimerDisplay', () => {
     await user.click(benchRow as Element);
 
     expect(screen.getByRole('button', { name: '次にやる' })).toBeInTheDocument();
+  });
+
+  it('「次にやる」ボタンを押すと確認ダイアログが表示され onDoNext はまだ呼ばれない', async () => {
+    const user = userEvent.setup();
+    const onDoNext = vi.fn();
+    const routine = createGroupedRoutine();
+
+    render(
+      <TimerDisplay
+        {...defaultProps}
+        routine={routine}
+        onDoNext={onDoNext}
+        state={{ ...initialTimerState, status: 'running', currentIndex: 0 }}
+      />,
+    );
+
+    const queue = screen.getByRole('region', { name: '現在の位置' });
+    const benchRow = Array.from(queue.querySelectorAll('[data-group]')).find((el) =>
+      el.textContent?.includes('ベンチプレス'),
+    );
+    await user.click(benchRow as Element);
+    await user.click(screen.getByRole('button', { name: '次にやる' }));
+
+    expect(screen.getByRole('dialog', { name: 'この順番にしますか？' })).toBeInTheDocument();
+    expect(onDoNext).not.toHaveBeenCalled();
   });
 
   it('ペア種目はグループラベルが（右/左）になりサブテキストが正しい', () => {
@@ -223,10 +297,9 @@ describe('TimerDisplay', () => {
     );
     await user.click(benchRow as Element);
     await user.click(screen.getByRole('button', { name: '次にやる' }));
+    await user.click(screen.getByRole('button', { name: '次にやる' })); // 確認ダイアログで確定
 
-    // ベンチプレスグループの開始インデックス = 4（スクワット3セット+休憩3件=6アイテム?）
     // createGroupedRoutine: スクワット×3(includeLastInterval:true) → [W,I,W,I,W,I] = 6アイテム
-    // ベンチプレス×2(includeLastInterval:false) → [W,I,W] = 3アイテム
     // ベンチプレスの開始インデックス = 6
     expect(onDoNext).toHaveBeenCalledWith(6);
   });

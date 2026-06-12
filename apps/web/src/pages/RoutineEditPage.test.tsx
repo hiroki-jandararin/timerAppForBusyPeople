@@ -131,6 +131,36 @@ describe('RoutineEditPage', () => {
     expect(intervalDurationInput.value).toBe('30');
   });
 
+  it('ペア種目（右/左）を一括追加できる', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+
+    render(
+      <RoutineEditPage
+        routine={createRoutine('A')}
+        existingRoutines={[]}
+        onSave={onSave}
+        onBack={vi.fn()}
+      />
+    );
+
+    await user.clear(screen.getByLabelText('種目名'));
+    await user.type(screen.getByLabelText('種目名'), 'ダンベルカール');
+    await user.click(screen.getByLabelText('ペア種目（右/左）'));
+    await user.click(screen.getByRole('button', { name: 'セットを追加' }));
+    await user.click(screen.getAllByRole('button', { name: '保存' })[0]);
+
+    expect(onSave).toHaveBeenCalledOnce();
+    const items = onSave.mock.calls[0][0].items as Array<{ type: string; title: string; groupId: string }>;
+    // 1セット目: W(右), W(左), I
+    expect(items[0].title).toContain('（右）');
+    expect(items[1].title).toContain('（左）');
+    expect(items[2].type).toBe('interval');
+    // 全アイテムが同じgroupIdを持つ
+    const groupIds = items.map((item) => item.groupId);
+    expect(new Set(groupIds).size).toBe(1);
+  });
+
   it('同じ名前のルーティンは保存できない', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();

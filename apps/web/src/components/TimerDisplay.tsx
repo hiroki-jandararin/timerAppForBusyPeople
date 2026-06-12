@@ -59,19 +59,23 @@ export function TimerDisplay({
   }, [state.currentIndex]);
 
   const groups = buildGroups(routine.items, state.currentIndex, isFinished);
-  const currentIsWorkout = current?.type === 'workout' && !isFinished && state.status !== 'idle';
+  const currentIsWorkout = current?.type === 'workout' && !isFinished;
   const currentGroup = groups.find((g) => g.status === 'current');
   const nextGroup = groups.find((g) => g.status === 'upcoming');
   const remainingSets = currentGroup ? currentGroup.setCount - currentGroup.completedSets : 0;
   const [showDeferConfirm, setShowDeferConfirm] = useState(false);
+  const [showDoNextConfirm, setShowDoNextConfirm] = useState(false);
 
   function handleGroupTap(groupStart: number) {
     setSelectedGroupStart((prev) => (prev === groupStart ? null : groupStart));
+    setShowDeferConfirm(false);
+    setShowDoNextConfirm(false);
   }
 
   function handleDoNext(groupStart: number) {
     onDoNext?.(groupStart);
     setSelectedGroupStart(null);
+    setShowDoNextConfirm(false);
   }
 
   return (
@@ -251,51 +255,6 @@ export function TimerDisplay({
             </button>
           </div>
 
-          {/* 後回しボタン / 確認ダイアログ */}
-          {currentIsWorkout && onDefer && (
-            showDeferConfirm ? (
-              <div
-                role="dialog"
-                aria-label="後回しにしますか？"
-                className="grid gap-3 rounded-xl border border-[#FF6B3530] bg-[#FF6B3508] p-4"
-              >
-                <div className="grid gap-1">
-                  <p className="m-0 text-sm font-black text-[#F5F5F5]">後回しにしますか？</p>
-                  <p className="m-0 text-sm text-[#D0D0D5]">
-                    「{currentGroup?.baseTitle}」の残り {remainingSets} セットを末尾に移動します。
-                  </p>
-                  {nextGroup && (
-                    <p className="m-0 text-sm text-[#D0D0D5]">
-                      次は「{nextGroup.baseTitle}」から続けます。
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    className="rounded-xl bg-[#FF6B35] py-2.5 text-sm font-black text-[#F5F5F5] transition active:scale-[0.97]"
-                    onClick={() => { onDefer(); setShowDeferConfirm(false); }}
-                  >
-                    後回しにする
-                  </button>
-                  <button
-                    className="rounded-xl border border-[#3C3C42] py-2.5 text-sm font-bold text-[#A0A0A5] transition active:scale-[0.97]"
-                    onClick={() => setShowDeferConfirm(false)}
-                  >
-                    キャンセル
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                aria-label="後回し"
-                className="flex w-full items-center justify-between rounded-xl border border-[#FF6B3530] bg-[#FF6B3508] px-4 py-3 text-sm font-bold text-[#FF6B35] transition active:scale-[0.97]"
-                onClick={() => setShowDeferConfirm(true)}
-              >
-                <span>後回し</span>
-                <span className="text-xs font-normal text-[#A0A0A5]">別の種目を先にやる →</span>
-              </button>
-            )
-          )}
 
           {/* Schedule delta */}
           <div
@@ -363,10 +322,10 @@ export function TimerDisplay({
                         : isSelected
                           ? '#FFFFFF14'
                           : '#FFFFFF08',
-                  border: `1px solid ${group.status === 'current' ? '#FF6B3535' : isSelected ? '#FF6B3540' : '#3C3C42'}`,
-                  cursor: group.status === 'upcoming' ? 'pointer' : 'default',
+                  border: `1px solid ${group.status === 'current' ? (isSelected ? '#FF6B3560' : '#FF6B3535') : isSelected ? '#FF6B3540' : '#3C3C42'}`,
+                  cursor: (group.status === 'upcoming' || (group.status === 'current' && currentIsWorkout)) ? 'pointer' : 'default',
                 }}
-                onClick={group.status === 'upcoming' ? () => handleGroupTap(group.itemStart) : undefined}
+                onClick={(group.status === 'upcoming' || (group.status === 'current' && currentIsWorkout)) ? () => handleGroupTap(group.itemStart) : undefined}
               >
                 <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
                   <span
@@ -421,17 +380,93 @@ export function TimerDisplay({
                     {formatClockDurationSec(group.totalSec)}
                   </span>
                 </div>
-                {isSelected && onDoNext && (
-                  <div className="mt-2">
-                    <button
-                      className="w-full rounded-xl bg-[#FF6B35] py-1.5 text-xs font-black text-[#F5F5F5] transition active:scale-[0.97]"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDoNext(group.itemStart);
-                      }}
-                    >
-                      次にやる
-                    </button>
+                {isSelected && (
+                  <div className="mt-2 grid gap-2">
+                    {group.status === 'upcoming' && onDoNext && (
+                      showDoNextConfirm ? (
+                        <div
+                          role="dialog"
+                          aria-label="この順番にしますか？"
+                          className="grid gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <p className="m-0 text-xs text-[#D0D0D5]">
+                            「{group.baseTitle}」を現在の直後に移動します。
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              className="rounded-xl bg-[#FF6B35] py-2 text-xs font-black text-[#F5F5F5] transition active:scale-[0.97]"
+                              onClick={(e) => { e.stopPropagation(); handleDoNext(group.itemStart); }}
+                            >
+                              次にやる
+                            </button>
+                            <button
+                              className="rounded-xl border border-[#3C3C42] py-2 text-xs font-bold text-[#A0A0A5] transition active:scale-[0.97]"
+                              onClick={(e) => { e.stopPropagation(); setShowDoNextConfirm(false); }}
+                            >
+                              キャンセル
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          className="w-full rounded-xl bg-[#FF6B35] py-1.5 text-xs font-black text-[#F5F5F5] transition active:scale-[0.97]"
+                          onClick={(e) => { e.stopPropagation(); setShowDoNextConfirm(true); }}
+                        >
+                          次にやる
+                        </button>
+                      )
+                    )}
+                    {group.status === 'current' && currentIsWorkout && onDefer && (
+                      showDeferConfirm ? (
+                        <div
+                          role="dialog"
+                          aria-label="後回しにしますか？"
+                          className="grid gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <p className="m-0 text-xs text-[#D0D0D5]">
+                            残り {group.setCount - group.completedSets} セットを末尾に移動します。
+                          </p>
+                          {nextGroup && (
+                            <p className="m-0 text-xs text-[#D0D0D5]">
+                              次は「{nextGroup.baseTitle}」から続けます。
+                            </p>
+                          )}
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              className="rounded-xl bg-[#FF6B35] py-2 text-xs font-black text-[#F5F5F5] transition active:scale-[0.97]"
+                              onClick={(e) => { e.stopPropagation(); onDefer(); setShowDeferConfirm(false); setSelectedGroupStart(null); }}
+                            >
+                              後回しにする
+                            </button>
+                            <button
+                              className="rounded-xl border border-[#3C3C42] py-2 text-xs font-bold text-[#A0A0A5] transition active:scale-[0.97]"
+                              onClick={(e) => { e.stopPropagation(); setShowDeferConfirm(false); }}
+                            >
+                              キャンセル
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          aria-label="後回し"
+                          className="flex w-full items-center gap-2.5 rounded-xl border border-[#FF6B3530] bg-[#FF6B3508] px-3 py-2.5 text-left transition active:scale-[0.97]"
+                          onClick={(e) => { e.stopPropagation(); setShowDeferConfirm(true); }}
+                        >
+                          <span
+                            className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-sm font-black"
+                            style={{ backgroundColor: '#FF6B3520', color: '#FF6B35' }}
+                          >
+                            ↷
+                          </span>
+                          <span className="grid gap-0.5">
+                            <span className="text-xs font-black text-[#FF6B35]">機器が埋まってる？</span>
+                            <span className="text-[0.6rem] font-normal text-[#A0A0A5]">このセットを後回しにする</span>
+                          </span>
+                        </button>
+                      )
+                    )}
                   </div>
                 )}
               </div>
@@ -459,17 +494,19 @@ type ExerciseGroup = {
 
 function buildGroupLabel(roundItems: RoutineItem[]): string {
   if (roundItems.length <= 1) return getBaseTitle(roundItems[0]?.title ?? '');
-  const first = getBaseTitle(roundItems[0].title);
-  const last = getBaseTitle(roundItems[roundItems.length - 1].title);
+  // セット番号・回数を除いて（右）/（左）などの括弧を残す
+  const stripNum = (t: string) => t.replace(/\s+\d+回$/, '').replace(/\s+\d+$/, '').trim();
+  const first = stripNum(roundItems[0].title);
+  const last = stripNum(roundItems[roundItems.length - 1].title);
   const firstParenIdx = first.lastIndexOf('（');
   const lastParenIdx = last.lastIndexOf('（');
-  if (firstParenIdx >= 0 && lastParenIdx >= 0) {
+  if (firstParenIdx >= 0 && lastParenIdx >= 0 && first.endsWith('）') && last.endsWith('）')) {
     const prefix = first.slice(0, firstParenIdx);
     const firstContent = first.slice(firstParenIdx + 1, first.length - 1);
     const lastContent = last.slice(lastParenIdx + 1, last.length - 1);
     return `${prefix}（${firstContent}/${lastContent}）`;
   }
-  return first;
+  return getBaseTitle(roundItems[0].title);
 }
 
 function buildGroups(
