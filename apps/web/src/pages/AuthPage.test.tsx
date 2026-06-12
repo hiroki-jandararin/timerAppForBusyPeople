@@ -23,7 +23,7 @@ describe('AuthPage', () => {
 
     render(<AuthPage onSignIn={vi.fn()} onSignUp={onSignUp} />);
 
-    await user.click(screen.getByRole('button', { name: '新規登録' }));
+    await user.click(screen.getByRole('button', { name: '新規登録はこちら' }));
     await user.type(screen.getByLabelText('メールアドレス'), 'new@example.com');
     await user.type(screen.getByLabelText('パスワード'), 'password123');
     await user.click(screen.getByRole('button', { name: '新規登録' }));

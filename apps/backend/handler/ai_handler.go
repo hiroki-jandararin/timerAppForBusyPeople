@@ -25,6 +25,7 @@ const systemPrompt = `あなたは筋トレプログラムの専門家です。�
 - workoutのdurationSecは種目の特性で自動選択: 大筋群（胸・背中・足前・足後ろ・背筋）→ 120秒、小筋群（腕・肩・腹筋・ふくらはぎ）→ 60秒
 - intervalのdurationSecは対応する種目に合わせて固定: 大筋群 → 60秒、小筋群 → 30秒
 - workoutのtitleは「種目名 N回」の形式にする（例: "ベンチプレス 10回"）
+- ダンベルカールを使う場合は必ず「ダンベルカール（右）」と「ダンベルカール（左）」をセットで追加し、両方のdurationSecと回数を同じにする
 
 ## 時間調整ルール（重要）
 生成したルーティンのトータル時間をユーザー指定時間にできるだけ近づけること。
@@ -62,6 +63,10 @@ JSONを出力する前に、以下を必ず確認すること:
 4セット: workout → interval → workout → interval → workout → interval → workout
 5セット: workout → interval → workout → interval → workout → interval → workout → interval → workout
 最後のitemは必ずworkoutで終わること。
+
+ダンベルカールの展開例（3セット）:
+ダンベルカール（右）→ ダンベルカール（左）→ interval → ダンベルカール（右）→ ダンベルカール（左）→ interval → ダンベルカール（右）→ ダンベルカール（左）
+右と左は常にペアで並べ、間にintervalを挟まない。
 
 ## 出力形式
 必ず以下のJSON形式のみを返すこと。説明文・コードブロックマーカー不要:
@@ -123,8 +128,8 @@ func (h *AIHandler) GenerateRoutine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if firstJSON, err := json.Marshal(generated); err == nil {
-		slog.Info("1回目生成結果", "routine", string(firstJSON))
+	if j, err := json.Marshal(generated); err == nil {
+		slog.Info("1回目生成完了", "name", generated.Name, "items", len(generated.Items), "totalSec", totalDuration(generated), "json", string(j))
 	}
 
 	if req.TargetSec > 0 {
@@ -142,16 +147,18 @@ func (h *AIHandler) GenerateRoutine(w http.ResponseWriter, r *http.Request) {
 					req.Prompt, string(prevJSON), actual, req.TargetSec, req.TargetSec,
 				)
 			}
-			slog.Info("リトライプロンプト", "prompt", retryPrompt)
+			slog.Info("リトライ実行", "actualSec", actual, "targetSec", req.TargetSec)
 			if retried, err := h.generator.Generate(retryPrompt); err == nil {
-				if retryJSON, err := json.Marshal(retried); err == nil {
-					slog.Info("リトライ結果", "routine", string(retryJSON), "retrySec", totalDuration(retried))
+				if j, err := json.Marshal(retried); err == nil {
+					slog.Info("リトライ完了", "name", retried.Name, "items", len(retried.Items), "totalSec", totalDuration(retried), "json", string(j))
 				}
 				generated = retried
+			} else {
+				slog.Warn("リトライ失敗、1回目の結果を使用", "error", err)
 			}
 		}
 	} else {
-		slog.Info("targetSec未指定のためリトライスキップ")
+		slog.Warn("targetSec未指定のためリトライスキップ")
 	}
 
 	json.NewEncoder(w).Encode(generated)

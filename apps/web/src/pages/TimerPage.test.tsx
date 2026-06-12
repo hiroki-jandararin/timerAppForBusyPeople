@@ -46,8 +46,8 @@ describe('TimerPage', () => {
 
     expect(screen.getAllByText('スクワット')).not.toHaveLength(0);
     expect(screen.getByLabelText('残り時間')).toHaveTextContent('0:30');
-    expect(screen.getByText(/終了予定時刻/)).toBeInTheDocument();
-    expect(screen.getByText('次へ')).toBeInTheDocument();
+    expect(screen.getByText(/終了予定/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '次の種目へ移動' })).toBeInTheDocument();
     expect(screen.getByText('開始前')).toBeInTheDocument();
   });
 
@@ -57,7 +57,7 @@ describe('TimerPage', () => {
     render(<TimerPage routine={createTimerRoutine()} voiceService={new MockVoiceService()} wakeLockService={wakeLockService} onBack={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: '開始' }));
-    expect(screen.getByText('開始まで')).toBeInTheDocument();
+    expect(screen.getAllByText('READY').length).toBeGreaterThan(0);
     expect(screen.getByLabelText('残り時間')).toHaveTextContent('0:03');
   });
 
@@ -71,6 +71,23 @@ describe('TimerPage', () => {
     expect(screen.getByRole('button', { name: 'カウントダウン' })).toBeDisabled();
   });
 
+  it('ワークアウト完了後は終了ボタンが表示されない', async () => {
+    vi.useFakeTimers();
+
+    try {
+      render(<TimerPage routine={createTimerRoutine()} voiceService={new MockVoiceService()} wakeLockService={wakeLockService} onBack={vi.fn()} />);
+
+      fireEvent.click(screen.getByRole('button', { name: '開始' }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(34000);
+      });
+
+      expect(screen.queryByRole('button', { name: '終了' })).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('終了後は終了予定時刻ではなく実際の終了時刻を表示する', () => {
     vi.useFakeTimers();
 
@@ -82,8 +99,8 @@ describe('TimerPage', () => {
       vi.setSystemTime(new Date(2026, 0, 1, 12, 35, 0));
       fireEvent.click(screen.getByRole('button', { name: '終了' }));
 
-      expect(screen.getByText(/終了時刻/)).toHaveTextContent('12:35');
-      expect(screen.queryByText(/終了予定時刻/)).not.toBeInTheDocument();
+      expect(screen.getByText(/終了 \d{1,2}:\d{2}/)).toHaveTextContent('12:35');
+      expect(screen.queryByText(/終了予定/)).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

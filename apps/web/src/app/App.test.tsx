@@ -32,15 +32,15 @@ describe('App', () => {
     await expect(repository.findAll()).resolves.toHaveLength(0);
 
     await user.click(screen.getByRole('button', { name: '最初のルーティンを作成' }));
-    expect(screen.getByText('テンプレートを選ぶ')).toBeInTheDocument();
+    expect(screen.getByText('テンプレートから選ぶ')).toBeInTheDocument();
     await expect(repository.findAll()).resolves.toHaveLength(0);
 
-    await user.click(screen.getByRole('button', { name: '最初から作る' }));
+    await user.click(screen.getByRole('button', { name: /最初から作る/ }));
     expect(screen.getByText('ルーティン名')).toBeInTheDocument();
     await expect(repository.findAll()).resolves.toHaveLength(0);
 
     await user.click(screen.getByRole('button', { name: '← 戻る' }));
-    expect(screen.getByText('テンプレートを選ぶ')).toBeInTheDocument();
+    expect(screen.getByText('テンプレートから選ぶ')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '← 戻る' }));
     await waitFor(() =>

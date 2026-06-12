@@ -2,7 +2,12 @@ import type { Routine, RoutineItem } from '../routines/routineTypes';
 import type { VoiceService } from '../voice/voiceService';
 import type { TimerState } from './timerTypes';
 
-export function announceForTransition(previous: TimerState, next: TimerState, routine: Routine, voice: VoiceService): void {
+export function announceForTransition(
+  previous: TimerState,
+  next: TimerState,
+  routine: Routine,
+  voice: VoiceService
+): void {
   const current = routine.items[next.currentIndex];
   if (previous.status === 'idle' && next.status === 'countdown') {
     voice.speak(String(next.remainingSec));
@@ -21,7 +26,7 @@ export function announceForTransition(previous: TimerState, next: TimerState, ro
     return;
   }
   if (next.status === 'finished' && previous.status !== 'finished') {
-    voice.speak('終了です');
+    voice.speak('終了です、お疲れ様でした');
     return;
   }
   if (next.status === 'running' && previous.remainingSec !== next.remainingSec) {
@@ -41,9 +46,10 @@ function formatNextAnnouncement(title: string, durationSec: number): string {
 }
 
 function formatCurrentAnnouncement(item: RoutineItem, upcoming?: RoutineItem): string {
-  const base = item.type === 'interval' && item.title.includes('休憩')
-    ? `休憩、${item.durationSec}秒`
-    : `${item.title}、${item.durationSec}秒`;
+  const base =
+    item.type === 'interval' && item.title.includes('休憩')
+      ? `休憩、${item.durationSec}秒`
+      : `${item.title}、${item.durationSec}秒`;
   if (item.type === 'interval' && item.title.includes('休憩') && upcoming) {
     return `${base}。${formatNextAnnouncement(upcoming.title, upcoming.durationSec)}`;
   }

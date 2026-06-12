@@ -37,7 +37,13 @@ type RestShorteningPlan = {
   }>;
 };
 
-export function TimerPage({ routine, voiceService, wakeLockService, onBack, onSaveHistory }: Props) {
+export function TimerPage({
+  routine,
+  voiceService,
+  wakeLockService,
+  onBack,
+  onSaveHistory,
+}: Props) {
   const [state, rawDispatch] = useReducer(timerReducer, initialTimerState);
   const [activeRoutine, setActiveRoutine] = useState(routine);
   const [plannedStartAtMs, setPlannedStartAtMs] = useState<number | null>(null);
@@ -237,11 +243,13 @@ export function TimerPage({ routine, voiceService, wakeLockService, onBack, onSa
       />
 
       {/* Stop button */}
-      <div className="pb-2">
-        <button className={stopBtn} onClick={() => dispatch({ type: 'finish' })}>
-          終了
-        </button>
-      </div>
+      {state.status !== 'finished' && (
+        <div className="pb-2">
+          <button className={stopBtn} onClick={() => dispatch({ type: 'finish' })}>
+            終了
+          </button>
+        </div>
+      )}
 
       {/* Adjustment dialog */}
       {isAdjustmentPromptOpen && (
@@ -421,5 +429,9 @@ function formatTime(timestampMs: number): string {
 
 function formatScheduleDifference(seconds: number): string {
   if (seconds === 0) return '予定通り';
-  return seconds > 0 ? `${Math.abs(seconds)}秒遅れ` : `${Math.abs(seconds)}秒早い`;
+  const abs = Math.abs(seconds);
+  const min = Math.floor(abs / 60);
+  const sec = abs % 60;
+  const label = min > 0 && sec > 0 ? `${min}分${sec}秒` : min > 0 ? `${min}分` : `${sec}秒`;
+  return seconds > 0 ? `${label}遅れ` : `${label}早い`;
 }
