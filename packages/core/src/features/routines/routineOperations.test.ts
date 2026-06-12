@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { getBaseTitle, getExerciseGroupRange, moveGroup } from './routineOperations';
+import { getBaseTitle, getExerciseGroupRange, moveGroup, addWorkoutSet, addItem, addPairedWorkoutSet } from './routineOperations';
 import { createRoutine } from './routineFactory';
 import type { Routine } from './routineTypes';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-function makeRoutine(items: Array<{ type: 'workout' | 'interval'; title: string; durationSec?: number }>): Routine {
+function makeRoutine(items: Array<{ type: 'workout' | 'interval'; title: string; durationSec?: number; groupId?: string }>): Routine {
   const routine = createRoutine('Test');
   return {
     ...routine,
@@ -15,6 +15,7 @@ function makeRoutine(items: Array<{ type: 'workout' | 'interval'; title: string;
       title: item.title,
       durationSec: item.durationSec ?? 30,
       voiceText: '',
+      ...(item.groupId !== undefined ? { groupId: item.groupId } : {}),
     })),
   };
 }
@@ -183,5 +184,129 @@ describe('moveGroup', () => {
     ]);
     const result = moveGroup(routine, 0, 3, 5, true);
     expect(result.items).toHaveLength(routine.items.length - 1); // trim で1件減る
+  });
+});
+
+// ─── groupId ────────────────────────────────────────────────────────────────
+
+describe('groupId', () => {
+  it('addWorkoutSetで追加したアイテムは全て同じgroupIdを持つ', () => {
+    const routine = addWorkoutSet(createRoutine(''), {
+      title: 'スクワット',
+      setCount: 3,
+      workoutDurationSec: 30,
+      intervalDurationSec: 20,
+      includeLastInterval: true,
+    });
+    const groupIds = routine.items.map((item) => item.groupId);
+    expect(groupIds.every((id) => id !== undefined && id !== '')).toBe(true);
+    expect(new Set(groupIds).size).toBe(1);
+  });
+
+  it('2回のaddWorkoutSetでは異なるgroupIdが付与される', () => {
+    let routine = addWorkoutSet(createRoutine(''), {
+      title: 'スクワット',
+      setCount: 2,
+      workoutDurationSec: 30,
+      intervalDurationSec: 20,
+      includeLastInterval: true,
+    });
+    routine = addWorkoutSet(routine, {
+      title: 'ベンチプレス',
+      setCount: 2,
+      workoutDurationSec: 30,
+      intervalDurationSec: 20,
+      includeLastInterval: false,
+    });
+    const squatGroupId = routine.items[0].groupId;
+    const benchGroupId = routine.items[routine.items.length - 1].groupId;
+    expect(squatGroupId).toBeDefined();
+    expect(benchGroupId).toBeDefined();
+    expect(squatGroupId).not.toBe(benchGroupId);
+  });
+
+  it('addItemで追加した各アイテムは固有のgroupIdを持つ', () => {
+    let routine = addItem(createRoutine(''), 'workout');
+    routine = addItem(routine, 'workout');
+    const [item1, item2] = routine.items;
+    expect(item1.groupId).toBeDefined();
+    expect(item2.groupId).toBeDefined();
+    expect(item1.groupId).not.toBe(item2.groupId);
+  });
+});
+
+// ─── addPairedWorkoutSet ──────────────────────────────────────────────────────
+
+describe('addPairedWorkoutSet', () => {
+  it('追加したアイテムはすべて同じgroupIdを持つ', () => {
+    const routine = addPairedWorkoutSet(createRoutine(''), {
+      title: 'ダンベルカール',
+      setCount: 3,
+      workoutDurationSec: 60,
+      intervalDurationSec: 30,
+      includeLastInterval: true,
+    });
+    const groupIds = routine.items.map((item) => item.groupId);
+    expect(groupIds.every((id) => id !== undefined && id !== '')).toBe(true);
+    expect(new Set(groupIds).size).toBe(1);
+  });
+
+  it('各セットが W(右)-W(左)-I のパターンで追加される', () => {
+    const routine = addPairedWorkoutSet(createRoutine(''), {
+      title: 'ダンベルカール',
+      setCount: 2,
+      workoutDurationSec: 60,
+      intervalDurationSec: 30,
+      includeLastInterval: false,
+    });
+    const types = routine.items.map((item) => item.type);
+    const titles = routine.items.map((item) => item.title);
+    // 2セット、末尾休憩なし: W(右1), W(左1), I, W(右2), W(左2)
+    expect(types).toEqual(['workout', 'workout', 'interval', 'workout', 'workout']);
+    expect(titles[0]).toContain('（右）');
+    expect(titles[1]).toContain('（左）');
+    expect(titles[3]).toContain('（右）');
+    expect(titles[4]).toContain('（左）');
+  });
+});
+
+// ─── getExerciseGroupRange (groupId対応) ────────────────────────────────────
+
+describe('getExerciseGroupRange (groupId対応)', () => {
+  it('groupIdが設定されている場合はgroupIdでグループ範囲を特定する', () => {
+    const gid = 'group-1';
+    const routine = makeRoutine([
+      { type: 'workout', title: 'ダンベルカール（右）', groupId: gid },
+      { type: 'workout', title: 'ダンベルカール（左）', groupId: gid },
+      { type: 'interval', title: '休憩', groupId: gid },
+      { type: 'workout', title: 'ダンベルカール（右）', groupId: gid },
+      { type: 'workout', title: 'ダンベルカール（左）', groupId: gid },
+      { type: 'interval', title: '休憩', groupId: gid },
+    ]);
+    expect(getExerciseGroupRange(routine.items, 0)).toEqual({ start: 0, end: 5 });
+    expect(getExerciseGroupRange(routine.items, 1)).toEqual({ start: 0, end: 5 });
+    expect(getExerciseGroupRange(routine.items, 3)).toEqual({ start: 0, end: 5 });
+  });
+
+  it('異なるgroupIdのアイテムはグループに含まれない', () => {
+    const routine = makeRoutine([
+      { type: 'workout', title: 'スクワット', groupId: 'g1' },
+      { type: 'interval', title: '休憩', groupId: 'g1' },
+      { type: 'workout', title: 'ベンチプレス', groupId: 'g2' },
+    ]);
+    expect(getExerciseGroupRange(routine.items, 0)).toEqual({ start: 0, end: 1 });
+    expect(getExerciseGroupRange(routine.items, 2)).toEqual({ start: 2, end: 2 });
+  });
+
+  it('groupIdがないアイテムは既存の名前ベースのフォールバックを使う', () => {
+    const routine = makeRoutine([
+      { type: 'workout', title: 'スクワット 1' },
+      { type: 'interval', title: '休憩' },
+      { type: 'workout', title: 'スクワット 2' },
+      { type: 'interval', title: '休憩' },
+      { type: 'workout', title: 'スクワット 3' },
+      { type: 'interval', title: '休憩' },
+    ]);
+    expect(getExerciseGroupRange(routine.items, 0)).toEqual({ start: 0, end: 5 });
   });
 });

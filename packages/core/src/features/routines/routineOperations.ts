@@ -35,9 +35,10 @@ export function duplicateRoutine(routine: Routine): Routine {
 }
 
 export function addItem(routine: Routine, type: RoutineItemType): Routine {
+  const groupId = `group_${crypto.randomUUID()}`;
   return {
     ...routine,
-    items: [...routine.items, createRoutineItem(type)],
+    items: [...routine.items, { ...createRoutineItem(type), groupId }],
     updatedAt: nowIso(),
   };
 }
@@ -55,6 +56,7 @@ export function addWorkoutSet(routine: Routine, input: AddWorkoutSetInput): Rout
   const workoutDurationSec = normalizeDuration(input.workoutDurationSec);
   const intervalDurationSec = normalizeDuration(input.intervalDurationSec);
   const title = input.title.trim() || 'ワークアウト';
+  const groupId = `group_${crypto.randomUUID()}`;
   const items: RoutineItem[] = [];
 
   for (let index = 0; index < setCount; index += 1) {
@@ -62,6 +64,7 @@ export function addWorkoutSet(routine: Routine, input: AddWorkoutSetInput): Rout
       ...createRoutineItem('workout'),
       title: setCount === 1 ? title : `${title} ${index + 1}`,
       durationSec: workoutDurationSec,
+      groupId,
     });
 
     if (input.includeLastInterval || index < setCount - 1) {
@@ -69,6 +72,7 @@ export function addWorkoutSet(routine: Routine, input: AddWorkoutSetInput): Rout
         ...createRoutineItem('interval'),
         title: '休憩',
         durationSec: intervalDurationSec,
+        groupId,
       });
     }
   }
@@ -129,6 +133,54 @@ export function moveItemDown(routine: Routine, itemId: string): Routine {
   return moveItem(routine, index, index + 1);
 }
 
+type AddPairedWorkoutSetInput = {
+  title: string;
+  workoutDurationSec: number;
+  intervalDurationSec: number;
+  setCount: number;
+  includeLastInterval: boolean;
+};
+
+export function addPairedWorkoutSet(routine: Routine, input: AddPairedWorkoutSetInput): Routine {
+  const setCount = normalizeCount(input.setCount);
+  const workoutDurationSec = normalizeDuration(input.workoutDurationSec);
+  const intervalDurationSec = normalizeDuration(input.intervalDurationSec);
+  const title = input.title.trim() || 'ワークアウト';
+  const groupId = `group_${crypto.randomUUID()}`;
+  const items: RoutineItem[] = [];
+
+  for (let index = 0; index < setCount; index += 1) {
+    const setLabel = setCount === 1 ? '' : ` ${index + 1}`;
+    items.push({
+      ...createRoutineItem('workout'),
+      title: `${title}（右）${setLabel}`.trimEnd(),
+      durationSec: workoutDurationSec,
+      groupId,
+    });
+    items.push({
+      ...createRoutineItem('workout'),
+      title: `${title}（左）${setLabel}`.trimEnd(),
+      durationSec: workoutDurationSec,
+      groupId,
+    });
+
+    if (input.includeLastInterval || index < setCount - 1) {
+      items.push({
+        ...createRoutineItem('interval'),
+        title: '休憩',
+        durationSec: intervalDurationSec,
+        groupId,
+      });
+    }
+  }
+
+  return {
+    ...routine,
+    items: [...routine.items, ...items],
+    updatedAt: nowIso(),
+  };
+}
+
 export function validateRoutine(routine: Routine, existingRoutines: Routine[] = []): string[] {
   const errors: string[] = [];
   const normalizedName = routine.name.trim();
@@ -177,9 +229,23 @@ export function getExerciseGroupRange(
   items: RoutineItem[],
   workoutIndex: number,
 ): { start: number; end: number } {
+  const groupId = items[workoutIndex]?.groupId;
+
+  if (groupId) {
+    let start = Infinity;
+    let end = -1;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].groupId === groupId) {
+        if (i < start) start = i;
+        if (i > end) end = i;
+      }
+    }
+    return { start: start === Infinity ? workoutIndex : start, end: end === -1 ? workoutIndex : end };
+  }
+
+  // フォールバック: groupId なし（旧データ）は名前ベースで検出
   const base = getBaseTitle(items[workoutIndex].title);
 
-  // 前方に同じベース名のセットが続く限り start を縮める
   let start = workoutIndex;
   while (
     start >= 2 &&
@@ -190,7 +256,6 @@ export function getExerciseGroupRange(
     start -= 2;
   }
 
-  // 後方に同じベース名のセットが続く限り end を伸ばす
   let end = workoutIndex;
   while (
     end + 2 < items.length &&
@@ -201,7 +266,6 @@ export function getExerciseGroupRange(
     end += 2;
   }
 
-  // グループ末尾 workout の直後の interval（種目間休憩）を1件だけ含む
   if (end + 1 < items.length && items[end + 1]?.type === 'interval') {
     end += 1;
   }

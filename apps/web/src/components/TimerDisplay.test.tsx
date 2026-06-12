@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { createRoutine } from '@timeapp/core';
-import { addItem, updateItem, addWorkoutSet } from '@timeapp/core';
+import { addItem, updateItem, addWorkoutSet, addPairedWorkoutSet } from '@timeapp/core';
 import { initialTimerState } from '@timeapp/core';
 import { TimerDisplay } from './TimerDisplay';
 
@@ -13,6 +13,16 @@ function createLongRoutine() {
     routine = updateItem(routine, routine.items[i].id, { title: `種目${i + 1}`, durationSec: 30 });
   }
   return routine;
+}
+
+function createPairedRoutine() {
+  return addPairedWorkoutSet(createRoutine('Paired'), {
+    title: 'ダンベルカール',
+    setCount: 3,
+    workoutDurationSec: 60,
+    intervalDurationSec: 30,
+    includeLastInterval: true,
+  });
 }
 
 function createGroupedRoutine() {
@@ -174,6 +184,23 @@ describe('TimerDisplay', () => {
     await user.click(benchRow as Element);
 
     expect(screen.getByRole('button', { name: '次にやる' })).toBeInTheDocument();
+  });
+
+  it('ペア種目はグループラベルが（右/左）になりサブテキストが正しい', () => {
+    const routine = createPairedRoutine();
+
+    render(
+      <TimerDisplay
+        {...defaultProps}
+        routine={routine}
+        state={{ ...initialTimerState, currentIndex: 0 }}
+      />,
+    );
+
+    const queue = screen.getByRole('region', { name: '現在の位置' });
+    expect(queue).toHaveTextContent('ダンベルカール（右/左）');
+    expect(queue).toHaveTextContent('× 3');
+    expect(queue).toHaveTextContent('(1分 ＋ 1分 ＋ 休憩 30秒) × 3');
   });
 
   it('「次にやる」ボタンを押すと onDoNext がグループ開始インデックスで呼ばれる', async () => {

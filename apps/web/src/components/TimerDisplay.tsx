@@ -406,9 +406,11 @@ export function TimerDisplay({
                     )}
                     {group.restSec > 0 && (
                       <p className="m-0 text-[0.6rem] font-normal text-[#6C6C72]">
-                        {group.setCount > 1
-                          ? `(${formatSubtextSec(group.perSetSec)} ＋ 休憩 ${formatSubtextSec(group.restSec)}) × ${group.setCount}`
-                          : `${formatSubtextSec(group.perSetSec)} ＋ 休憩 ${formatSubtextSec(group.restSec)}`}
+                        {(() => {
+                          const workPart = group.roundWorkoutSecs.map(formatSubtextSec).join(' ＋ ');
+                          const full = `${workPart} ＋ 休憩 ${formatSubtextSec(group.restSec)}`;
+                          return group.setCount > 1 ? `(${full}) × ${group.setCount}` : full;
+                        })()}
                       </p>
                     )}
                   </div>
@@ -447,13 +449,28 @@ type ExerciseGroup = {
   baseTitle: string;
   setCount: number;
   totalSec: number;
-  perSetSec: number;
+  roundWorkoutSecs: number[];
   restSec: number;
   completedSets: number;
   status: 'done' | 'current' | 'upcoming';
   itemStart: number;
   itemEnd: number;
 };
+
+function buildGroupLabel(roundItems: RoutineItem[]): string {
+  if (roundItems.length <= 1) return getBaseTitle(roundItems[0]?.title ?? '');
+  const first = getBaseTitle(roundItems[0].title);
+  const last = getBaseTitle(roundItems[roundItems.length - 1].title);
+  const firstParenIdx = first.lastIndexOf('（');
+  const lastParenIdx = last.lastIndexOf('（');
+  if (firstParenIdx >= 0 && lastParenIdx >= 0) {
+    const prefix = first.slice(0, firstParenIdx);
+    const firstContent = first.slice(firstParenIdx + 1, first.length - 1);
+    const lastContent = last.slice(lastParenIdx + 1, last.length - 1);
+    return `${prefix}（${firstContent}/${lastContent}）`;
+  }
+  return first;
+}
 
 function buildGroups(
   items: RoutineItem[],
@@ -474,30 +491,40 @@ function buildGroups(
     const workoutItems = items.slice(start, end + 1).filter((it) => it.type === 'workout');
     const intervalItems = items.slice(start, end + 1).filter((it) => it.type === 'interval');
     const totalSec = items.slice(start, end + 1).reduce((sum, it) => sum + it.durationSec, 0);
-    const perSetSec = workoutItems[0]?.durationSec ?? 0;
     const restSec = intervalItems[0]?.durationSec ?? 0;
+
+    // ラウンド内ワークアウト数（最初のintervalまでのworkout数）
+    let workoutsPerRound = 0;
+    for (let j = start; j <= end; j++) {
+      if (items[j].type === 'workout') workoutsPerRound++;
+      else break;
+    }
+    if (workoutsPerRound === 0) workoutsPerRound = 1;
+
+    const roundWorkouts = items.slice(start, start + workoutsPerRound).filter((it) => it.type === 'workout');
+    const roundWorkoutSecs = roundWorkouts.map((it) => it.durationSec);
+    const setCount = Math.round(workoutItems.length / workoutsPerRound);
 
     let status: ExerciseGroup['status'];
     let completedSets: number;
 
     if (isFinished || currentIndex > end) {
       status = 'done';
-      completedSets = workoutItems.length;
+      completedSets = setCount;
     } else if (currentIndex >= start && currentIndex <= end) {
       status = 'current';
-      completedSets = items
-        .slice(start, currentIndex)
-        .filter((it) => it.type === 'workout').length;
+      const completedWorkouts = items.slice(start, currentIndex).filter((it) => it.type === 'workout').length;
+      completedSets = Math.floor(completedWorkouts / workoutsPerRound);
     } else {
       status = 'upcoming';
       completedSets = 0;
     }
 
     groups.push({
-      baseTitle: getBaseTitle(item.title),
-      setCount: workoutItems.length,
+      baseTitle: buildGroupLabel(roundWorkouts),
+      setCount,
       totalSec,
-      perSetSec,
+      roundWorkoutSecs,
       restSec,
       completedSets,
       status,

@@ -6,6 +6,7 @@ export type WorkoutItem = {
   title: string;
   durationSec: number;
   voiceText: string;
+  groupId?: string;
 };
 
 export type IntervalItem = {
@@ -14,6 +15,7 @@ export type IntervalItem = {
   title: string;
   durationSec: number;
   voiceText: string;
+  groupId?: string;
 };
 
 export type RoutineItem = WorkoutItem | IntervalItem;
