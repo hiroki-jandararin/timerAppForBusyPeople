@@ -4,6 +4,8 @@ import {
   calculateRemainingRoutineDuration,
   calculateTotalDuration,
   formatClockDuration,
+  getExerciseGroupRange,
+  moveGroup,
 } from '@timeapp/core';
 import type { Routine } from '@timeapp/core';
 import { announceForTransition } from '@timeapp/core';
@@ -177,6 +179,25 @@ export function TimerPage({
     }
   }
 
+  function handleDefer() {
+    const cur = stateRef.current;
+    const items = activeRoutine.items;
+    if (items[cur.currentIndex]?.type !== 'workout') return;
+    const { end } = getExerciseGroupRange(items, cur.currentIndex);
+    const newRoutine = moveGroup(activeRoutine, cur.currentIndex, end, items.length, true);
+    setActiveRoutine(newRoutine);
+    // currentIndex は変えない：moveGroup 後の同インデックスが次の種目を指す
+  }
+
+  function handleDoNext(groupStart: number) {
+    const cur = stateRef.current;
+    const items = activeRoutine.items;
+    const { end: currentGroupEnd } = getExerciseGroupRange(items, cur.currentIndex);
+    const { end: targetGroupEnd } = getExerciseGroupRange(items, groupStart);
+    const newRoutine = moveGroup(activeRoutine, groupStart, targetGroupEnd, currentGroupEnd + 1, false);
+    setActiveRoutine(newRoutine);
+  }
+
   const primaryBtn =
     'min-h-16 w-full rounded-2xl bg-[#FF6B35] text-[#F5F5F5] text-xl font-black tracking-wide shadow-lg shadow-[#FF6B35]/20 transition active:scale-[0.97] disabled:opacity-50';
   const pauseBtn =
@@ -216,6 +237,8 @@ export function TimerPage({
         scheduleDeltaSec={timing.deltaSec}
         onPrevious={() => dispatch({ type: 'previous', routine: activeRoutine })}
         onNext={() => dispatch({ type: 'skip', routine: activeRoutine })}
+        onDefer={handleDefer}
+        onDoNext={handleDoNext}
         controls={
           <div>
             {state.status === 'idle' || state.status === 'finished' ? (
@@ -259,8 +282,8 @@ export function TimerPage({
           aria-modal="true"
           aria-labelledby="adjustment-suggestion-title"
         >
-          <section className="grid w-full max-w-sm gap-4 rounded-2xl border border-[#3C3C42] bg-[#1E1E21] p-5 shadow-2xl shadow-black/80">
-            <div className="grid gap-1.5">
+          <section className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-[#3C3C42] bg-[#1E1E21] p-5 shadow-2xl shadow-black/80 max-h-[90dvh] overflow-hidden">
+            <div className="grid gap-1.5 shrink-0">
               <p className="m-0 text-xs font-black tracking-[0.15em] uppercase text-[#EF4444]">
                 {formatScheduleDifference(timing.deltaSec)}
               </p>
@@ -275,7 +298,7 @@ export function TimerPage({
               </p>
             </div>
 
-            <div className="rounded-xl border border-[#3C3C42] bg-[#2C2C30] p-3">
+            <div className="min-h-0 overflow-y-auto rounded-xl border border-[#3C3C42] bg-[#2C2C30] p-3">
               <h3 className="m-0 text-sm font-black tracking-wide text-[#F5F5F5]">休憩短縮</h3>
               <p className="m-0 mt-1 text-xs font-bold text-[#A0A0A5]">
                 この先の休憩{restShorteningPlan.changedCount}件を同じ割合で短くします。
@@ -296,13 +319,13 @@ export function TimerPage({
             </div>
 
             <button
-              className="min-h-14 w-full rounded-2xl bg-[#FF6B35] text-lg font-black text-[#F5F5F5] shadow-lg shadow-[#FF6B35]/20 transition active:scale-[0.97]"
+              className="min-h-14 w-full shrink-0 rounded-2xl bg-[#FF6B35] text-lg font-black text-[#F5F5F5] shadow-lg shadow-[#FF6B35]/20 transition active:scale-[0.97]"
               onClick={applyRestShortening}
             >
               休憩を短縮する
             </button>
             <button
-              className="min-h-12 w-full rounded-2xl border border-[#3C3C42] bg-[#2C2C30] font-bold text-[#A0A0A5] transition active:scale-[0.97]"
+              className="min-h-12 w-full shrink-0 rounded-2xl border border-[#3C3C42] bg-[#2C2C30] font-bold text-[#A0A0A5] transition active:scale-[0.97]"
               onClick={() => setIsAdjustmentPromptOpen(false)}
             >
               今回はしない

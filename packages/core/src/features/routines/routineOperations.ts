@@ -168,3 +168,70 @@ function moveItem(routine: Routine, from: number, to: number): Routine {
     updatedAt: nowIso(),
   };
 }
+
+export function getBaseTitle(title: string): string {
+  return title.replace(/\s+\d+$/, '').trim();
+}
+
+export function getExerciseGroupRange(
+  items: RoutineItem[],
+  workoutIndex: number,
+): { start: number; end: number } {
+  const base = getBaseTitle(items[workoutIndex].title);
+
+  // 前方に同じベース名のセットが続く限り start を縮める
+  let start = workoutIndex;
+  while (
+    start >= 2 &&
+    items[start - 1]?.type === 'interval' &&
+    items[start - 2]?.type === 'workout' &&
+    getBaseTitle(items[start - 2].title) === base
+  ) {
+    start -= 2;
+  }
+
+  // 後方に同じベース名のセットが続く限り end を伸ばす
+  let end = workoutIndex;
+  while (
+    end + 2 < items.length &&
+    items[end + 1]?.type === 'interval' &&
+    items[end + 2]?.type === 'workout' &&
+    getBaseTitle(items[end + 2].title) === base
+  ) {
+    end += 2;
+  }
+
+  // グループ末尾 workout の直後の interval（種目間休憩）を1件だけ含む
+  if (end + 1 < items.length && items[end + 1]?.type === 'interval') {
+    end += 1;
+  }
+
+  return { start, end };
+}
+
+export function moveGroup(
+  routine: Routine,
+  groupStart: number,
+  groupEnd: number,
+  insertBefore: number,
+  trimTrailingInterval: boolean,
+): Routine {
+  const hasTrailingInterval = routine.items[groupEnd]?.type === 'interval';
+  const shouldTrim = trimTrailingInterval && hasTrailingInterval;
+
+  const items = [...routine.items];
+  // groupStart..groupEnd を丸ごと取り出し（種目間休憩を含む）
+  const extracted = items.splice(groupStart, groupEnd - groupStart + 1);
+  // trim 時は末尾の interval を捨てる（ルーティン末尾が rest にならないよう）
+  const group = shouldTrim ? extracted.slice(0, -1) : extracted;
+
+  // splice で前方要素が消えた分だけ挿入位置を補正
+  const rawInsert = insertBefore > groupStart
+    ? insertBefore - (groupEnd - groupStart + 1)
+    : insertBefore;
+  const adjustedInsert = Math.min(rawInsert, items.length);
+
+  items.splice(adjustedInsert, 0, ...group);
+
+  return { ...routine, items, updatedAt: nowIso() };
+}

@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { createRoutine } from '@timeapp/core';
-import { addItem, updateItem } from '@timeapp/core';
+import { addItem, updateItem, addWorkoutSet } from '@timeapp/core';
 import { MockVoiceService } from '../features/voice/mockVoiceService';
 import type { WakeLockService } from '@timeapp/core';
 import { TimerPage } from './TimerPage';
@@ -166,5 +166,95 @@ describe('TimerPage', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('後回しボタンを押すと現在グループが末尾に移動して次へ進む', async () => {
+    const user = userEvent.setup();
+    // スクワット×2 + 種目間休憩 + ベンチプレス×1
+    let routine = addWorkoutSet(createRoutine('Test'), {
+      title: 'スクワット',
+      setCount: 2,
+      workoutDurationSec: 30,
+      intervalDurationSec: 20,
+      includeLastInterval: true,
+    });
+    routine = addWorkoutSet(routine, {
+      title: 'ベンチプレス',
+      setCount: 1,
+      workoutDurationSec: 30,
+      intervalDurationSec: 20,
+      includeLastInterval: false,
+    });
+
+    render(
+      <TimerPage
+        routine={routine}
+        voiceService={new MockVoiceService()}
+        wakeLockService={wakeLockService}
+        onBack={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: '開始' }));
+    await user.click(screen.getByRole('button', { name: '後回し' }));
+    await user.click(screen.getByRole('button', { name: '後回しにする' }));
+
+    // ベンチプレスが現在の種目になる
+    expect(screen.getAllByText('ベンチプレス').length).toBeGreaterThan(0);
+
+    // QUEUEでスクワットが最後のグループになっている
+    const queue = screen.getByRole('region', { name: '現在の位置' });
+    const groups = Array.from(queue.querySelectorAll('[data-group]'));
+    expect(groups[groups.length - 1]?.textContent).toContain('スクワット');
+  });
+
+  it('次にやるでQUEUEの未来グループが現在の直後に移動する', async () => {
+    const user = userEvent.setup();
+    let routine = addWorkoutSet(createRoutine('Test'), {
+      title: 'スクワット',
+      setCount: 1,
+      workoutDurationSec: 30,
+      intervalDurationSec: 20,
+      includeLastInterval: true,
+    });
+    routine = addWorkoutSet(routine, {
+      title: 'ベンチプレス',
+      setCount: 1,
+      workoutDurationSec: 30,
+      intervalDurationSec: 20,
+      includeLastInterval: true,
+    });
+    routine = addWorkoutSet(routine, {
+      title: '懸垂',
+      setCount: 1,
+      workoutDurationSec: 30,
+      intervalDurationSec: 20,
+      includeLastInterval: false,
+    });
+
+    render(
+      <TimerPage
+        routine={routine}
+        voiceService={new MockVoiceService()}
+        wakeLockService={wakeLockService}
+        onBack={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: '開始' }));
+
+    // 懸垂グループ行をタップして「次にやる」
+    const queue = screen.getByRole('region', { name: '現在の位置' });
+    const kenkuRow = Array.from(queue.querySelectorAll('[data-group]')).find((el) =>
+      el.textContent?.includes('懸垂'),
+    );
+    await user.click(kenkuRow as Element);
+    await user.click(screen.getByRole('button', { name: '次にやる' }));
+
+    // QUEUEの2番目グループが懸垂になっている
+    const updatedGroups = Array.from(
+      screen.getByRole('region', { name: '現在の位置' }).querySelectorAll('[data-group]'),
+    );
+    expect(updatedGroups[1]?.textContent).toContain('懸垂');
   });
 });

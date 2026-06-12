@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import type { Routine, RoutineItem } from '@timeapp/core';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { getBaseTitle, getExerciseGroupRange, type Routine, type RoutineItem } from '@timeapp/core';
 import type { TimerState } from '@timeapp/core';
 
 type Props = {
@@ -11,6 +11,8 @@ type Props = {
   onPrevious: () => void;
   onNext: () => void;
   controls: ReactNode;
+  onDefer?: () => void;
+  onDoNext?: (groupStart: number) => void;
 };
 
 export function TimerDisplay({
@@ -22,6 +24,8 @@ export function TimerDisplay({
   onPrevious,
   onNext,
   controls,
+  onDefer,
+  onDoNext,
 }: Props) {
   const current = routine.items[state.currentIndex];
   const previous = routine.items[state.currentIndex - 1];
@@ -47,7 +51,28 @@ export function TimerDisplay({
   const ringRadius = 52;
   const ringCircumference = 2 * Math.PI * ringRadius;
   const ringOffset = ringCircumference * (1 - remainingRatio);
-  const visibleItems = getVisibleItems(routine.items, state.currentIndex);
+  const currentItemRef = useRef<HTMLDivElement | null>(null);
+  const [selectedGroupStart, setSelectedGroupStart] = useState<number | null>(null);
+
+  useEffect(() => {
+    currentItemRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [state.currentIndex]);
+
+  const groups = buildGroups(routine.items, state.currentIndex, isFinished);
+  const currentIsWorkout = current?.type === 'workout' && !isFinished && state.status !== 'idle';
+  const currentGroup = groups.find((g) => g.status === 'current');
+  const nextGroup = groups.find((g) => g.status === 'upcoming');
+  const remainingSets = currentGroup ? currentGroup.setCount - currentGroup.completedSets : 0;
+  const [showDeferConfirm, setShowDeferConfirm] = useState(false);
+
+  function handleGroupTap(groupStart: number) {
+    setSelectedGroupStart((prev) => (prev === groupStart ? null : groupStart));
+  }
+
+  function handleDoNext(groupStart: number) {
+    onDoNext?.(groupStart);
+    setSelectedGroupStart(null);
+  }
 
   return (
     <section className="grid gap-4 rounded-2xl bg-[#1E1E21] p-4 py-5 shadow-2xl shadow-black/60 border border-[#2C2C30]">
@@ -226,6 +251,52 @@ export function TimerDisplay({
             </button>
           </div>
 
+          {/* 後回しボタン / 確認ダイアログ */}
+          {currentIsWorkout && onDefer && (
+            showDeferConfirm ? (
+              <div
+                role="dialog"
+                aria-label="後回しにしますか？"
+                className="grid gap-3 rounded-xl border border-[#FF6B3530] bg-[#FF6B3508] p-4"
+              >
+                <div className="grid gap-1">
+                  <p className="m-0 text-sm font-black text-[#F5F5F5]">後回しにしますか？</p>
+                  <p className="m-0 text-sm text-[#D0D0D5]">
+                    「{currentGroup?.baseTitle}」の残り {remainingSets} セットを末尾に移動します。
+                  </p>
+                  {nextGroup && (
+                    <p className="m-0 text-sm text-[#D0D0D5]">
+                      次は「{nextGroup.baseTitle}」から続けます。
+                    </p>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    className="rounded-xl bg-[#FF6B35] py-2.5 text-sm font-black text-[#F5F5F5] transition active:scale-[0.97]"
+                    onClick={() => { onDefer(); setShowDeferConfirm(false); }}
+                  >
+                    後回しにする
+                  </button>
+                  <button
+                    className="rounded-xl border border-[#3C3C42] py-2.5 text-sm font-bold text-[#A0A0A5] transition active:scale-[0.97]"
+                    onClick={() => setShowDeferConfirm(false)}
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                aria-label="後回し"
+                className="flex w-full items-center justify-between rounded-xl border border-[#FF6B3530] bg-[#FF6B3508] px-4 py-3 text-sm font-bold text-[#FF6B35] transition active:scale-[0.97]"
+                onClick={() => setShowDeferConfirm(true)}
+              >
+                <span>後回し</span>
+                <span className="text-xs font-normal text-[#A0A0A5]">別の種目を先にやる →</span>
+              </button>
+            )
+          )}
+
           {/* Schedule delta */}
           <div
             className="rounded-xl px-3 py-2 text-center text-sm font-black tracking-wide"
@@ -262,7 +333,7 @@ export function TimerDisplay({
       </div>
 
       {/* Item queue */}
-      <div className="rounded-xl bg-[#2C2C30] p-3" aria-label="現在の位置">
+      <div className="rounded-xl bg-[#2C2C30] p-3" role="region" aria-label="現在の位置">
         <div className="mb-2.5 flex items-center justify-between">
           <h2 className="m-0 text-[0.6rem] font-black tracking-[0.2em] uppercase text-[#A0A0A5]">
             QUEUE
@@ -274,42 +345,93 @@ export function TimerDisplay({
             {progress}%
           </span>
         </div>
-        <div className="grid gap-1.5">
-          {visibleItems.map(({ item, index }) => {
-            const isCurrent = state.status !== 'finished' && index === state.currentIndex;
-            const isDone = state.status === 'finished' || index < state.currentIndex;
+        <div className="max-h-48 overflow-y-auto grid gap-1.5">
+          {groups.map((group) => {
+            const isSelected = selectedGroupStart === group.itemStart;
             return (
               <div
-                key={item.id}
-                className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-xl px-2.5 py-2 text-sm"
+                key={group.itemStart}
+                data-group={group.itemStart}
+                ref={group.status === 'current' ? currentItemRef : null}
+                className="rounded-xl px-2.5 py-2 text-sm transition"
                 style={{
-                  backgroundColor: isCurrent ? '#FF6B3512' : isDone ? '#FFFFFF06' : '#FFFFFF08',
-                  border: `1px solid ${isCurrent ? '#FF6B3535' : '#3C3C42'}`,
+                  backgroundColor:
+                    group.status === 'current'
+                      ? '#FF6B3512'
+                      : group.status === 'done'
+                        ? '#FFFFFF06'
+                        : isSelected
+                          ? '#FFFFFF14'
+                          : '#FFFFFF08',
+                  border: `1px solid ${group.status === 'current' ? '#FF6B3535' : isSelected ? '#FF6B3540' : '#3C3C42'}`,
+                  cursor: group.status === 'upcoming' ? 'pointer' : 'default',
                 }}
+                onClick={group.status === 'upcoming' ? () => handleGroupTap(group.itemStart) : undefined}
               >
-                <span
-                  className="grid h-6 w-6 shrink-0 place-items-center rounded-lg text-xs font-black"
-                  style={{
-                    backgroundColor: isCurrent ? '#FF6B35' : isDone ? '#3C3C42' : '#2C2C30',
-                    color: isCurrent ? '#F5F5F5' : isDone ? '#4ADE80' : '#A0A0A5',
-                  }}
-                >
-                  {isDone ? '✓' : index + 1}
-                </span>
-                <span
-                  className={`truncate font-bold ${isCurrent ? 'text-[#F5F5F5]' : isDone ? 'text-[#A0A0A5]' : 'text-[#D0D0D5]'}`}
-                >
-                  {item.title}
-                </span>
-                <span
-                  className="shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold"
-                  style={{
-                    backgroundColor: item.type === 'interval' ? '#4ADE8015' : '#FF6B3515',
-                    color: item.type === 'interval' ? '#4ADE80' : '#FF6B35',
-                  }}
-                >
-                  {item.durationSec}秒
-                </span>
+                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
+                  <span
+                    className="grid h-6 w-6 shrink-0 place-items-center rounded-lg text-xs font-black"
+                    style={{
+                      backgroundColor:
+                        group.status === 'current'
+                          ? '#FF6B35'
+                          : group.status === 'done'
+                            ? '#3C3C42'
+                            : '#1E1E21',
+                      color:
+                        group.status === 'current'
+                          ? '#F5F5F5'
+                          : group.status === 'done'
+                            ? '#4ADE80'
+                            : '#A0A0A5',
+                    }}
+                  >
+                    {group.status === 'done' ? '✓' : group.status === 'current' ? '→' : '·'}
+                  </span>
+                  <div className="min-w-0">
+                    <span
+                      className={`truncate font-bold ${group.status === 'current' ? 'text-[#F5F5F5]' : group.status === 'done' ? 'text-[#A0A0A5]' : 'text-[#D0D0D5]'}`}
+                    >
+                      {group.baseTitle}
+                      {group.setCount > 1 && (
+                        <span className="ml-1.5 text-xs font-bold text-[#A0A0A5]">
+                          × {group.setCount}
+                        </span>
+                      )}
+                    </span>
+                    {group.status === 'current' && group.setCount > 1 && (
+                      <p className="m-0 text-[0.6rem] font-bold text-[#A0A0A5]">
+                        {group.completedSets}/{group.setCount} セット完了
+                      </p>
+                    )}
+                    {group.restSec > 0 && (
+                      <p className="m-0 text-[0.6rem] font-normal text-[#6C6C72]">
+                        {group.setCount > 1
+                          ? `(${formatSubtextSec(group.perSetSec)} ＋ 休憩 ${formatSubtextSec(group.restSec)}) × ${group.setCount}`
+                          : `${formatSubtextSec(group.perSetSec)} ＋ 休憩 ${formatSubtextSec(group.restSec)}`}
+                      </p>
+                    )}
+                  </div>
+                  <span
+                    className="shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold"
+                    style={{ backgroundColor: '#FF6B3515', color: '#FF6B35' }}
+                  >
+                    {formatClockDurationSec(group.totalSec)}
+                  </span>
+                </div>
+                {isSelected && onDoNext && (
+                  <div className="mt-2">
+                    <button
+                      className="w-full rounded-xl bg-[#FF6B35] py-1.5 text-xs font-black text-[#F5F5F5] transition active:scale-[0.97]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDoNext(group.itemStart);
+                      }}
+                    >
+                      次にやる
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -317,6 +439,89 @@ export function TimerDisplay({
       </div>
     </section>
   );
+}
+
+// ─── Queue group helpers ─────────────────────────────────────────────────────
+
+type ExerciseGroup = {
+  baseTitle: string;
+  setCount: number;
+  totalSec: number;
+  perSetSec: number;
+  restSec: number;
+  completedSets: number;
+  status: 'done' | 'current' | 'upcoming';
+  itemStart: number;
+  itemEnd: number;
+};
+
+function buildGroups(
+  items: RoutineItem[],
+  currentIndex: number,
+  isFinished: boolean,
+): ExerciseGroup[] {
+  const groups: ExerciseGroup[] = [];
+  let i = 0;
+
+  while (i < items.length) {
+    const item = items[i];
+    if (item.type !== 'workout') {
+      i++;
+      continue;
+    }
+
+    const { start, end } = getExerciseGroupRange(items, i);
+    const workoutItems = items.slice(start, end + 1).filter((it) => it.type === 'workout');
+    const intervalItems = items.slice(start, end + 1).filter((it) => it.type === 'interval');
+    const totalSec = items.slice(start, end + 1).reduce((sum, it) => sum + it.durationSec, 0);
+    const perSetSec = workoutItems[0]?.durationSec ?? 0;
+    const restSec = intervalItems[0]?.durationSec ?? 0;
+
+    let status: ExerciseGroup['status'];
+    let completedSets: number;
+
+    if (isFinished || currentIndex > end) {
+      status = 'done';
+      completedSets = workoutItems.length;
+    } else if (currentIndex >= start && currentIndex <= end) {
+      status = 'current';
+      completedSets = items
+        .slice(start, currentIndex)
+        .filter((it) => it.type === 'workout').length;
+    } else {
+      status = 'upcoming';
+      completedSets = 0;
+    }
+
+    groups.push({
+      baseTitle: getBaseTitle(item.title),
+      setCount: workoutItems.length,
+      totalSec,
+      perSetSec,
+      restSec,
+      completedSets,
+      status,
+      itemStart: start,
+      itemEnd: end,
+    });
+
+    i = end + 1;
+  }
+
+  return groups;
+}
+
+function formatSubtextSec(sec: number): string {
+  if (sec < 60) return `${sec}秒`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return s > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${m}分`;
+}
+
+function formatClockDurationSec(totalSec: number): string {
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return s > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${m}:00`;
 }
 
 function formatCountdown(sec: number): string {
@@ -393,14 +598,6 @@ function getTimerTone({ isFinished, isLate, isRest, isCountdown, isWarning }: Ti
   };
 }
 
-function getVisibleItems(
-  items: RoutineItem[],
-  currentIndex: number
-): Array<{ item: RoutineItem; index: number }> {
-  const start = Math.max(0, currentIndex - 1);
-  const end = Math.min(items.length, currentIndex + 4);
-  return items.slice(start, end).map((item, offset) => ({ item, index: start + offset }));
-}
 
 const CONFETTI_PIECES: Array<{
   x: number;
