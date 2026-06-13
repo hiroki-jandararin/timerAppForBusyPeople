@@ -5,6 +5,7 @@ import { calcCurrentStreak } from './HistoryPage';
 function makeHistory(dateStr: string): WorkoutHistory {
   return {
     id: dateStr,
+    userId: 'user1',
     routineId: 'r1',
     routineName: 'test',
     startedAt: `${dateStr}T10:00:00`,
@@ -12,6 +13,7 @@ function makeHistory(dateStr: string): WorkoutHistory {
     completed: true,
     itemsCompleted: 3,
     itemsCount: 3,
+    createdAt: `${dateStr}T10:30:00`,
   };
 }
 
