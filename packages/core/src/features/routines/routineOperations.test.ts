@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getBaseTitle, getExerciseGroupRange, moveGroup, addWorkoutSet, addItem, addPairedWorkoutSet } from './routineOperations';
+import { getBaseTitle, getExerciseGroupRange, moveGroup, addWorkoutSet, addItem, addPairedWorkoutSet, buildGroups, assignGroupIds } from './routineOperations';
 import { createRoutine } from './routineFactory';
 import type { Routine } from './routineTypes';
 
@@ -354,5 +354,153 @@ describe('getExerciseGroupRange (groupId対応)', () => {
       { type: 'interval', title: '休憩' },
     ]);
     expect(getExerciseGroupRange(routine.items, 0)).toEqual({ start: 0, end: 5 });
+  });
+});
+
+// ─── buildGroups ─────────────────────────────────────────────────────────────
+
+describe('buildGroups', () => {
+  it('単体ワークアウト1つ → グループ1つ（current）', () => {
+    const routine = makeRoutine([{ type: 'workout', title: 'スクワット', durationSec: 30 }]);
+    const groups = buildGroups(routine.items, 0, false);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].status).toBe('current');
+    expect(groups[0].setCount).toBe(1);
+    expect(groups[0].baseTitle).toBe('スクワット');
+    expect(groups[0].roundWorkoutSecs).toEqual([30]);
+  });
+
+  it('3セット → 1グループ、setCount=3', () => {
+    const routine = makeRoutine([
+      { type: 'workout', title: 'スクワット 1', durationSec: 30 },
+      { type: 'interval', title: '休憩', durationSec: 20 },
+      { type: 'workout', title: 'スクワット 2', durationSec: 30 },
+      { type: 'interval', title: '休憩', durationSec: 20 },
+      { type: 'workout', title: 'スクワット 3', durationSec: 30 },
+    ]);
+    const groups = buildGroups(routine.items, 0, false);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].setCount).toBe(3);
+    expect(groups[0].baseTitle).toBe('スクワット');
+    expect(groups[0].restSec).toBe(20);
+  });
+
+  it('2グループ → done/current のステータスが正しい', () => {
+    const routine = makeRoutine([
+      { type: 'workout', title: 'スクワット 1', durationSec: 30 },
+      { type: 'interval', title: '休憩', durationSec: 20 },
+      { type: 'workout', title: 'スクワット 2', durationSec: 30 },
+      { type: 'interval', title: '休憩(種目間)', durationSec: 20 },
+      { type: 'workout', title: 'ベンチプレス 1', durationSec: 30 },
+      { type: 'interval', title: '休憩', durationSec: 20 },
+      { type: 'workout', title: 'ベンチプレス 2', durationSec: 30 },
+    ]);
+    const groups = buildGroups(routine.items, 4, false);
+    expect(groups).toHaveLength(2);
+    expect(groups[0].status).toBe('done');
+    expect(groups[1].status).toBe('current');
+  });
+
+  it('3グループ → done/current/upcoming が正しい', () => {
+    const routine = makeRoutine([
+      { type: 'workout', title: 'スクワット', durationSec: 30 },
+      { type: 'interval', title: '休憩', durationSec: 20 },
+      { type: 'workout', title: 'ベンチプレス', durationSec: 30 },
+      { type: 'interval', title: '休憩', durationSec: 20 },
+      { type: 'workout', title: '懸垂', durationSec: 30 },
+    ]);
+    const groups = buildGroups(routine.items, 2, false);
+    expect(groups[0].status).toBe('done');
+    expect(groups[1].status).toBe('current');
+    expect(groups[2].status).toBe('upcoming');
+  });
+
+  it('ペア種目（W-W-I）→ ラベルが（右/左）になり roundWorkoutSecs が2つある', () => {
+    const routine = makeRoutine([
+      { type: 'workout', title: 'ダンベルカール（右） 1', durationSec: 60 },
+      { type: 'workout', title: 'ダンベルカール（左） 1', durationSec: 60 },
+      { type: 'interval', title: '休憩', durationSec: 30 },
+    ]);
+    const groups = buildGroups(routine.items, 0, false);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].baseTitle).toBe('ダンベルカール（右/左）');
+    expect(groups[0].roundWorkoutSecs).toEqual([60, 60]);
+    expect(groups[0].setCount).toBe(1);
+  });
+
+  it('isFinished=true → 全グループが done', () => {
+    const routine = makeRoutine([
+      { type: 'workout', title: 'スクワット', durationSec: 30 },
+      { type: 'interval', title: '休憩', durationSec: 20 },
+      { type: 'workout', title: 'ベンチプレス', durationSec: 30 },
+    ]);
+    const groups = buildGroups(routine.items, 0, true);
+    expect(groups.every((g) => g.status === 'done')).toBe(true);
+  });
+
+  it('completedSets がグループ途中で正しく計算される', () => {
+    const routine = makeRoutine([
+      { type: 'workout', title: 'スクワット 1', durationSec: 30 },
+      { type: 'interval', title: '休憩', durationSec: 20 },
+      { type: 'workout', title: 'スクワット 2', durationSec: 30 },
+      { type: 'interval', title: '休憩', durationSec: 20 },
+      { type: 'workout', title: 'スクワット 3', durationSec: 30 },
+    ]);
+    const groups = buildGroups(routine.items, 2, false);
+    expect(groups[0].completedSets).toBe(1);
+  });
+
+  it('itemStart/itemEnd が正しく設定される', () => {
+    const routine = makeRoutine([
+      { type: 'workout', title: 'スクワット 1', durationSec: 30 },
+      { type: 'interval', title: '休憩', durationSec: 20 },
+      { type: 'workout', title: 'スクワット 2', durationSec: 30 },
+      { type: 'interval', title: '休憩(種目間)', durationSec: 20 },
+      { type: 'workout', title: 'ベンチプレス', durationSec: 30 },
+    ]);
+    const groups = buildGroups(routine.items, 0, false);
+    expect(groups[0].itemStart).toBe(0);
+    expect(groups[0].itemEnd).toBe(3);
+    expect(groups[1].itemStart).toBe(4);
+    expect(groups[1].itemEnd).toBe(4);
+  });
+});
+
+// ─── assignGroupIds ───────────────────────────────────────────────────────────
+
+describe('assignGroupIds', () => {
+  it('ペア種目（右/左）は同じgroupIdを持つ', () => {
+    const items = [
+      { title: 'ダンベルカール（右） 10回', type: 'workout' as const },
+      { title: 'ダンベルカール（左） 10回', type: 'workout' as const },
+      { title: '休憩', type: 'interval' as const },
+      { title: 'ダンベルカール（右） 10回', type: 'workout' as const },
+      { title: 'ダンベルカール（左） 10回', type: 'workout' as const },
+    ];
+    const ids = assignGroupIds(items);
+    expect(new Set(ids).size).toBe(1);
+  });
+
+  it('異なる種目は異なるgroupIdを持つ', () => {
+    const items = [
+      { title: 'スクワット 10回', type: 'workout' as const },
+      { title: '休憩', type: 'interval' as const },
+      { title: 'ベンチプレス 10回', type: 'workout' as const },
+    ];
+    const ids = assignGroupIds(items);
+    expect(ids[0]).toBe(ids[1]);
+    expect(ids[0]).not.toBe(ids[2]);
+  });
+
+  it('同じ種目の複数セットは同じgroupIdを持つ', () => {
+    const items = [
+      { title: 'スクワット 10回', type: 'workout' as const },
+      { title: '休憩', type: 'interval' as const },
+      { title: 'スクワット 10回', type: 'workout' as const },
+      { title: '休憩', type: 'interval' as const },
+      { title: 'スクワット 10回', type: 'workout' as const },
+    ];
+    const ids = assignGroupIds(items);
+    expect(new Set(ids).size).toBe(1);
   });
 });

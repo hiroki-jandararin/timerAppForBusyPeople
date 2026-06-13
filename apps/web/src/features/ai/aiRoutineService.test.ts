@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assignGroupIds } from './aiRoutineService';
+import { assignGroupIds } from '@timeapp/core';
 
 describe('assignGroupIds', () => {
   it('ペア種目（右/左）は同じgroupIdを持つ', () => {

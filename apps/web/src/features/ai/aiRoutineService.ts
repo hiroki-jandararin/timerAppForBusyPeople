@@ -1,4 +1,4 @@
-import { createRoutine } from '@timeapp/core';
+import { assignGroupIds, createRoutine } from '@timeapp/core';
 import type { Routine } from '@timeapp/core';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
@@ -35,33 +35,6 @@ export async function generateAiRoutine(
   return toRoutine(generated, targetDurationSec);
 }
 
-function toGroupBase(title: string): string {
-  let base = title.replace(/\s*\d+回$/, '').trim();  // "スクワット 10回" → "スクワット"
-  base = base.replace(/\s+\d+$/, '').trim();           // "スクワット 1" → "スクワット"
-  base = base.replace(/（[^）]*）$/, '').trim();         // "ダンベルカール（右）" → "ダンベルカール"
-  return base;
-}
-
-export function assignGroupIds(items: Array<{ title: string; type: string }>): string[] {
-  const result: string[] = [];
-  let currentBase: string | null = null;
-  let currentGroupId: string | null = null;
-
-  for (const item of items) {
-    if (item.type === 'workout') {
-      const base = toGroupBase(item.title);
-      if (base !== currentBase) {
-        currentBase = base;
-        currentGroupId = `group_${crypto.randomUUID()}`;
-      }
-      result.push(currentGroupId!);
-    } else {
-      result.push(currentGroupId ?? `group_${crypto.randomUUID()}`);
-    }
-  }
-
-  return result;
-}
 
 function toRoutine(generated: GeneratedRoutine, targetDurationSec?: number): Routine {
   const routine = createRoutine(generated.name);
