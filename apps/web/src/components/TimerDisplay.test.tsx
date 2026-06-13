@@ -303,4 +303,59 @@ describe('TimerDisplay', () => {
     // ベンチプレスの開始インデックス = 6
     expect(onDoNext).toHaveBeenCalledWith(6);
   });
+
+  it('onDoNext が渡されると QUEUE にヒントテキストが表示される', () => {
+    render(
+      <TimerDisplay
+        {...defaultProps}
+        routine={createGroupedRoutine()}
+        state={{ ...initialTimerState, currentIndex: 0 }}
+      />,
+    );
+
+    const queue = screen.getByRole('region', { name: '現在の位置' });
+    expect(queue).toHaveTextContent('タップして順番変更');
+  });
+
+  it('onDoNext が渡されない場合ヒントテキストは表示されない', () => {
+    const { onDoNext: _, ...propsWithoutDoNext } = defaultProps;
+
+    render(
+      <TimerDisplay
+        {...propsWithoutDoNext}
+        routine={createGroupedRoutine()}
+        state={{ ...initialTimerState, currentIndex: 0 }}
+      />,
+    );
+
+    const queue = screen.getByRole('region', { name: '現在の位置' });
+    expect(queue).not.toHaveTextContent('タップして順番変更');
+  });
+
+  it('onDoNext が渡されると upcoming グループにドラッグハンドルが表示される', () => {
+    render(
+      <TimerDisplay
+        {...defaultProps}
+        routine={createGroupedRoutine()}
+        state={{ ...initialTimerState, currentIndex: 0 }}
+      />,
+    );
+
+    const handles = screen.getAllByRole('img', { name: '並び替え可能' });
+    expect(handles.length).toBeGreaterThan(0);
+  });
+
+  it('onDoNext が渡されない場合ドラッグハンドルは表示されない', () => {
+    const { onDoNext: _, ...propsWithoutDoNext } = defaultProps;
+
+    render(
+      <TimerDisplay
+        {...propsWithoutDoNext}
+        routine={createGroupedRoutine()}
+        state={{ ...initialTimerState, currentIndex: 0 }}
+      />,
+    );
+
+    expect(screen.queryAllByRole('img', { name: '並び替え可能' })).toHaveLength(0);
+  });
 });

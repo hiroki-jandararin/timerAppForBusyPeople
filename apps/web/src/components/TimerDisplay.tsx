@@ -255,7 +255,6 @@ export function TimerDisplay({
             </button>
           </div>
 
-
           {/* Schedule delta */}
           <div
             className="rounded-xl px-3 py-2 text-center text-sm font-black tracking-wide"
@@ -274,10 +273,7 @@ export function TimerDisplay({
 
       {/* Progress bar — always visible */}
       <div>
-        <div
-          className="h-1.5 overflow-hidden rounded-full bg-[#2C2C30]"
-          aria-label="全体進捗"
-        >
+        <div className="h-1.5 overflow-hidden rounded-full bg-[#2C2C30]" aria-label="全体進捗">
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
@@ -323,9 +319,16 @@ export function TimerDisplay({
                           ? '#FFFFFF14'
                           : '#FFFFFF08',
                   border: `1px solid ${group.status === 'current' ? (isSelected ? '#FF6B3560' : '#FF6B3535') : isSelected ? '#FF6B3540' : '#3C3C42'}`,
-                  cursor: (group.status === 'upcoming' || (group.status === 'current' && currentIsWorkout)) ? 'pointer' : 'default',
+                  cursor:
+                    group.status === 'upcoming' || (group.status === 'current' && currentIsWorkout)
+                      ? 'pointer'
+                      : 'default',
                 }}
-                onClick={(group.status === 'upcoming' || (group.status === 'current' && currentIsWorkout)) ? () => handleGroupTap(group.itemStart) : undefined}
+                onClick={
+                  group.status === 'upcoming' || (group.status === 'current' && currentIsWorkout)
+                    ? () => handleGroupTap(group.itemStart)
+                    : undefined
+                }
               >
                 <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
                   <span
@@ -366,7 +369,9 @@ export function TimerDisplay({
                     {group.restSec > 0 && (
                       <p className="m-0 text-[0.6rem] font-normal text-[#6C6C72]">
                         {(() => {
-                          const workPart = group.roundWorkoutSecs.map(formatSubtextSec).join(' ＋ ');
+                          const workPart = group.roundWorkoutSecs
+                            .map(formatSubtextSec)
+                            .join(' ＋ ');
                           const full = `${workPart} ＋ 休憩 ${formatSubtextSec(group.restSec)}`;
                           return group.setCount > 1 ? `(${full}) × ${group.setCount}` : full;
                         })()}
@@ -379,11 +384,21 @@ export function TimerDisplay({
                   >
                     {formatClockDurationSec(group.totalSec)}
                   </span>
+                  {group.status === 'upcoming' && onDoNext && (
+                    <span
+                      role="img"
+                      aria-label="並び替え可能"
+                      className="shrink-0 text-base leading-none text-[#4C4C52] select-none"
+                    >
+                      ⠿
+                    </span>
+                  )}
                 </div>
                 {isSelected && (
                   <div className="mt-2 grid gap-2">
-                    {group.status === 'upcoming' && onDoNext && (
-                      showDoNextConfirm ? (
+                    {group.status === 'upcoming' &&
+                      onDoNext &&
+                      (showDoNextConfirm ? (
                         <div
                           role="dialog"
                           aria-label="この順番にしますか？"
@@ -396,13 +411,19 @@ export function TimerDisplay({
                           <div className="grid grid-cols-2 gap-2">
                             <button
                               className="rounded-xl bg-[#FF6B35] py-2 text-xs font-black text-[#F5F5F5] transition active:scale-[0.97]"
-                              onClick={(e) => { e.stopPropagation(); handleDoNext(group.itemStart); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDoNext(group.itemStart);
+                              }}
                             >
                               次にやる
                             </button>
                             <button
                               className="rounded-xl border border-[#3C3C42] py-2 text-xs font-bold text-[#A0A0A5] transition active:scale-[0.97]"
-                              onClick={(e) => { e.stopPropagation(); setShowDoNextConfirm(false); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDoNextConfirm(false);
+                              }}
                             >
                               キャンセル
                             </button>
@@ -411,14 +432,18 @@ export function TimerDisplay({
                       ) : (
                         <button
                           className="w-full rounded-xl bg-[#FF6B35] py-1.5 text-xs font-black text-[#F5F5F5] transition active:scale-[0.97]"
-                          onClick={(e) => { e.stopPropagation(); setShowDoNextConfirm(true); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDoNextConfirm(true);
+                          }}
                         >
                           次にやる
                         </button>
-                      )
-                    )}
-                    {group.status === 'current' && currentIsWorkout && onDefer && (
-                      showDeferConfirm ? (
+                      ))}
+                    {group.status === 'current' &&
+                      currentIsWorkout &&
+                      onDefer &&
+                      (showDeferConfirm ? (
                         <div
                           role="dialog"
                           aria-label="後回しにしますか？"
@@ -436,13 +461,21 @@ export function TimerDisplay({
                           <div className="grid grid-cols-2 gap-2">
                             <button
                               className="rounded-xl bg-[#FF6B35] py-2 text-xs font-black text-[#F5F5F5] transition active:scale-[0.97]"
-                              onClick={(e) => { e.stopPropagation(); onDefer(); setShowDeferConfirm(false); setSelectedGroupStart(null); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDefer();
+                                setShowDeferConfirm(false);
+                                setSelectedGroupStart(null);
+                              }}
                             >
                               後回しにする
                             </button>
                             <button
                               className="rounded-xl border border-[#3C3C42] py-2 text-xs font-bold text-[#A0A0A5] transition active:scale-[0.97]"
-                              onClick={(e) => { e.stopPropagation(); setShowDeferConfirm(false); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDeferConfirm(false);
+                              }}
                             >
                               キャンセル
                             </button>
@@ -452,7 +485,10 @@ export function TimerDisplay({
                         <button
                           aria-label="後回し"
                           className="flex w-full items-center gap-2.5 rounded-xl border border-[#FF6B3530] bg-[#FF6B3508] px-3 py-2.5 text-left transition active:scale-[0.97]"
-                          onClick={(e) => { e.stopPropagation(); setShowDeferConfirm(true); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDeferConfirm(true);
+                          }}
                         >
                           <span
                             className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-sm font-black"
@@ -461,18 +497,24 @@ export function TimerDisplay({
                             ↷
                           </span>
                           <span className="grid gap-0.5">
-                            <span className="text-xs font-black text-[#FF6B35]">機器が埋まってる？</span>
-                            <span className="text-[0.6rem] font-normal text-[#A0A0A5]">このセットを後回しにする</span>
+                            <span className="text-xs font-black text-[#FF6B35]">
+                              マシンが埋まっている場合こちらをタップ
+                            </span>
+                            <span className="text-[0.6rem] font-normal text-[#A0A0A5]">
+                              このセットを後回しにする
+                            </span>
                           </span>
                         </button>
-                      )
-                    )}
+                      ))}
                   </div>
                 )}
               </div>
             );
           })}
         </div>
+        {onDoNext && groups.some((g) => g.status === 'upcoming') && (
+          <p className="mt-2 mb-0 text-center text-[0.6rem] text-[#d0d0d8]">タップして順番変更</p>
+        )}
       </div>
     </section>
   );
@@ -495,7 +537,11 @@ type ExerciseGroup = {
 function buildGroupLabel(roundItems: RoutineItem[]): string {
   if (roundItems.length <= 1) return getBaseTitle(roundItems[0]?.title ?? '');
   // セット番号・回数を除いて（右）/（左）などの括弧を残す
-  const stripNum = (t: string) => t.replace(/\s+\d+回$/, '').replace(/\s+\d+$/, '').trim();
+  const stripNum = (t: string) =>
+    t
+      .replace(/\s+\d+回$/, '')
+      .replace(/\s+\d+$/, '')
+      .trim();
   const first = stripNum(roundItems[0].title);
   const last = stripNum(roundItems[roundItems.length - 1].title);
   const firstParenIdx = first.lastIndexOf('（');
@@ -512,7 +558,7 @@ function buildGroupLabel(roundItems: RoutineItem[]): string {
 function buildGroups(
   items: RoutineItem[],
   currentIndex: number,
-  isFinished: boolean,
+  isFinished: boolean
 ): ExerciseGroup[] {
   const groups: ExerciseGroup[] = [];
   let i = 0;
@@ -538,7 +584,9 @@ function buildGroups(
     }
     if (workoutsPerRound === 0) workoutsPerRound = 1;
 
-    const roundWorkouts = items.slice(start, start + workoutsPerRound).filter((it) => it.type === 'workout');
+    const roundWorkouts = items
+      .slice(start, start + workoutsPerRound)
+      .filter((it) => it.type === 'workout');
     const roundWorkoutSecs = roundWorkouts.map((it) => it.durationSec);
     const setCount = Math.round(workoutItems.length / workoutsPerRound);
 
@@ -550,7 +598,9 @@ function buildGroups(
       completedSets = setCount;
     } else if (currentIndex >= start && currentIndex <= end) {
       status = 'current';
-      const completedWorkouts = items.slice(start, currentIndex).filter((it) => it.type === 'workout').length;
+      const completedWorkouts = items
+        .slice(start, currentIndex)
+        .filter((it) => it.type === 'workout').length;
       completedSets = Math.floor(completedWorkouts / workoutsPerRound);
     } else {
       status = 'upcoming';
@@ -661,7 +711,6 @@ function getTimerTone({ isFinished, isLate, isRest, isCountdown, isWarning }: Ti
     phaseColor: '#FF6B35',
   };
 }
-
 
 const CONFETTI_PIECES: Array<{
   x: number;
