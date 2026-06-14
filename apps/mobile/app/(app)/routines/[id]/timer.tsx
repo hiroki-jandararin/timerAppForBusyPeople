@@ -4,11 +4,16 @@ import { routineApiClient } from '@timeapp/api-client';
 import type { Routine } from '@timeapp/core';
 import {
   announceForTransition,
+  buildGroups,
+  getExerciseGroupRange,
   initialTimerState,
+  moveGroup,
   timerReducer,
+  type ExerciseGroup,
   type TimerAction,
 } from '@timeapp/core';
 import { ExpoSpeechVoiceService } from '@/features/voice/expoSpeechVoiceService';
+import { ExpoKeepAwakeService } from '@/features/wakeLock/expoKeepAwakeService';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import {
@@ -42,19 +47,40 @@ export default function TimerScreen() {
   const router = useRouter();
 
   const [routine, setRoutine] = useState<Routine | null>(null);
+  const [activeRoutine, setActiveRoutine] = useState<Routine | null>(null);
   const [state, rawDispatch] = useReducer(timerReducer, initialTimerState);
   const progressAnim = useRef(new Animated.Value(1)).current;
   const stateRef = useRef(state);
   const voiceService = useRef(new ExpoSpeechVoiceService()).current;
+  const wakeLockService = useRef(new ExpoKeepAwakeService()).current;
 
   const api = routineApiClient({ baseUrl: API_BASE_URL, getToken: () => token });
 
   function dispatch(action: TimerAction) {
-    if (!routine) { rawDispatch(action); return; }
+    const r = activeRoutine ?? routine;
+    if (!r) { rawDispatch(action); return; }
     const previous = stateRef.current;
     const next = timerReducer(previous, action);
-    announceForTransition(previous, next, routine, voiceService);
+    announceForTransition(previous, next, r, voiceService);
     rawDispatch(action);
+  }
+
+  function handleDefer() {
+    const r = activeRoutine;
+    if (!r) return;
+    const cur = stateRef.current;
+    if (r.items[cur.currentIndex]?.type !== 'workout') return;
+    const { end } = getExerciseGroupRange(r.items, cur.currentIndex);
+    setActiveRoutine(moveGroup(r, cur.currentIndex, end, r.items.length, true));
+  }
+
+  function handleDoNext(groupStart: number) {
+    const r = activeRoutine;
+    if (!r) return;
+    const cur = stateRef.current;
+    const { end: currentEnd } = getExerciseGroupRange(r.items, cur.currentIndex);
+    const { end: targetEnd } = getExerciseGroupRange(r.items, groupStart);
+    setActiveRoutine(moveGroup(r, groupStart, targetEnd, currentEnd + 1, false));
   }
 
   useEffect(() => {
@@ -62,16 +88,26 @@ export default function TimerScreen() {
   }, [state]);
 
   useEffect(() => {
-    api.getById(id).then(setRoutine);
+    if (state.status === 'running' || state.status === 'countdown') {
+      void wakeLockService.request();
+    } else {
+      void wakeLockService.release();
+    }
+    return () => { void wakeLockService.release(); };
+  }, [state.status]);
+
+  useEffect(() => {
+    api.getById(id).then((r) => { setRoutine(r); setActiveRoutine(r); });
   }, [id]);
 
   useEffect(() => {
     if (state.status !== 'running' && state.status !== 'countdown') return;
     const interval = setInterval(() => {
-      if (routine) dispatch({ type: 'tick', routine });
+      const r = activeRoutine ?? routine;
+      if (r) dispatch({ type: 'tick', routine: r });
     }, 1000);
     return () => clearInterval(interval);
-  }, [state.status, routine]);
+  }, [state.status, activeRoutine, routine]);
 
   useEffect(() => {
     if (!routine || state.status !== 'running') return;
@@ -93,10 +129,13 @@ export default function TimerScreen() {
     );
   }
 
-  const currentItem = routine.items[state.currentIndex];
+  const ar = activeRoutine ?? routine;
+  const currentItem = ar.items[state.currentIndex];
   const isInterval = currentItem?.type === 'interval';
   const accentColor = isInterval ? Colors.green : Colors.orange;
   const send = (action: TimerAction) => dispatch(action);
+  const groups = buildGroups(ar.items, state.currentIndex, state.status === 'finished');
+  const currentIsWorkout = currentItem?.type === 'workout';
 
   if (state.status === 'finished') {
     return (
@@ -149,7 +188,7 @@ export default function TimerScreen() {
   });
 
   const overallProgress =
-    routine.items.length > 0 ? (state.currentIndex / routine.items.length) * 100 : 0;
+    ar.items.length > 0 ? (state.currentIndex / ar.items.length) * 100 : 0;
 
   const isWarning = state.remainingSec > 0 && state.remainingSec <= 3;
   const ringColor = isWarning ? Colors.yellow : accentColor;
@@ -218,8 +257,8 @@ export default function TimerScreen() {
         </Text>
 
         <Text style={styles.nextLabel}>
-          {routine.items[state.currentIndex + 1]
-            ? `次: ${routine.items[state.currentIndex + 1].title}`
+          {ar.items[state.currentIndex + 1]
+            ? `次: ${ar.items[state.currentIndex + 1].title}`
             : ' '}
         </Text>
       </View>
@@ -238,7 +277,7 @@ export default function TimerScreen() {
         <View style={styles.controls}>
           <Pressable
             style={({ pressed }) => [styles.ctrlBtn, pressed && { opacity: 0.6 }]}
-            onPress={() => send({ type: 'previous', routine })}
+            onPress={() => send({ type: 'previous', routine: ar })}
           >
             <Text style={styles.ctrlIcon}>⏮</Text>
           </Pressable>
@@ -260,7 +299,7 @@ export default function TimerScreen() {
 
           <Pressable
             style={({ pressed }) => [styles.ctrlBtn, pressed && { opacity: 0.6 }]}
-            onPress={() => send({ type: 'skip', routine })}
+            onPress={() => send({ type: 'skip', routine: ar })}
           >
             <Text style={styles.ctrlIcon}>⏭</Text>
           </Pressable>
@@ -269,6 +308,36 @@ export default function TimerScreen() {
         <Pressable style={styles.finishLink} onPress={() => send({ type: 'finish' })}>
           <Text style={styles.finishLinkText}>終了する</Text>
         </Pressable>
+
+        {/* QUEUE */}
+        <View style={styles.queue}>
+          <Text style={styles.queueLabel}>QUEUE</Text>
+          {groups.map((group: ExerciseGroup) => (
+            <View key={group.itemStart} style={[
+              styles.queueItem,
+              group.status === 'current' && styles.queueItemCurrent,
+              group.status === 'done' && styles.queueItemDone,
+            ]}>
+              <Text style={[
+                styles.queueItemTitle,
+                group.status === 'done' && styles.queueItemTitleDone,
+              ]}>
+                {group.baseTitle}
+                {group.setCount > 1 ? ` × ${group.setCount}` : ''}
+              </Text>
+              {group.status === 'current' && currentIsWorkout && (
+                <Pressable onPress={handleDefer} style={styles.queueBtn}>
+                  <Text style={styles.queueBtnText}>後回し</Text>
+                </Pressable>
+              )}
+              {group.status === 'upcoming' && (
+                <Pressable onPress={() => handleDoNext(group.itemStart)} style={styles.queueBtn}>
+                  <Text style={styles.queueBtnText}>次にやる</Text>
+                </Pressable>
+              )}
+            </View>
+          ))}
+        </View>
       </View>
     </View>
   );
@@ -397,4 +466,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   doneBtnText: { color: Colors.bg, fontSize: 16, fontWeight: '700' },
+  // queue
+  queue: { gap: 4, marginTop: 4 },
+  queueLabel: { color: Colors.textMuted, fontSize: 10, fontWeight: '900', letterSpacing: 2, marginBottom: 4 },
+  queueItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF08', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+    borderWidth: 1, borderColor: '#3C3C42',
+  },
+  queueItemCurrent: { backgroundColor: '#FF6B3512', borderColor: '#FF6B3535' },
+  queueItemDone: { opacity: 0.4 },
+  queueItemTitle: { flex: 1, color: Colors.text, fontSize: 13, fontWeight: '700' },
+  queueItemTitleDone: { color: Colors.textMuted },
+  queueBtn: { backgroundColor: Colors.orange, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 },
+  queueBtnText: { color: Colors.bg, fontSize: 11, fontWeight: '800' },
 });
