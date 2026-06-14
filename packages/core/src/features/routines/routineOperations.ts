@@ -439,6 +439,80 @@ function toGroupBase(title: string): string {
   return base;
 }
 
+const MIN_SHORTENED_REST_SEC = 15;
+
+export type RestShorteningPlan = {
+  routine: Routine;
+  recoveredSec: number;
+  changedCount: number;
+  changes: Array<{ title: string; beforeSec: number; afterSec: number; shortenedSec: number }>;
+};
+
+export function createRestShorteningPlan(
+  routine: Routine,
+  currentIndex: number,
+  requiredSec: number
+): RestShorteningPlan {
+  const restCandidates = routine.items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item, index }) =>
+      index > currentIndex && item.type === 'interval' && item.durationSec > MIN_SHORTENED_REST_SEC
+    );
+  const totalRestSec = restCandidates.reduce((sum, { item }) => sum + item.durationSec, 0);
+  const maxRecoverableSec = restCandidates.reduce(
+    (sum, { item }) => sum + item.durationSec - MIN_SHORTENED_REST_SEC,
+    0
+  );
+  const targetRecoverSec = Math.min(requiredSec, maxRecoverableSec);
+
+  if (totalRestSec <= 0 || targetRecoverSec <= 0) {
+    return { routine, recoveredSec: 0, changedCount: 0, changes: [] };
+  }
+
+  const reductionRatio = targetRecoverSec / totalRestSec;
+  const shortenPlans = restCandidates.map(({ item, index }) => {
+    const maxShortenSec = item.durationSec - MIN_SHORTENED_REST_SEC;
+    const proportionalShortenSec = item.durationSec * reductionRatio;
+    const baseShortenSec = Math.min(maxShortenSec, Math.floor(proportionalShortenSec));
+    return { index, maxShortenSec, shortenSec: baseShortenSec, remainder: proportionalShortenSec - baseShortenSec };
+  });
+
+  let recoveredSec = shortenPlans.reduce((sum, p) => sum + p.shortenSec, 0);
+  let remainingShortenSec = targetRecoverSec - recoveredSec;
+  const plansByRemainder = [...shortenPlans].sort((a, b) => b.remainder - a.remainder);
+  while (remainingShortenSec > 0) {
+    let distributed = 0;
+    for (const plan of plansByRemainder) {
+      if (remainingShortenSec <= 0) break;
+      if (plan.shortenSec >= plan.maxShortenSec) continue;
+      plan.shortenSec += 1;
+      recoveredSec += 1;
+      remainingShortenSec -= 1;
+      distributed += 1;
+    }
+    if (distributed === 0) break;
+  }
+
+  const shortenByIndex = new Map(shortenPlans.map((p) => [p.index, p.shortenSec]));
+  const items = routine.items.map((item, index) => {
+    const shortenSec = shortenByIndex.get(index) ?? 0;
+    return shortenSec > 0 ? { ...item, durationSec: item.durationSec - shortenSec } : item;
+  });
+  const changes = shortenPlans
+    .filter((p) => p.shortenSec > 0)
+    .map((p) => {
+      const item = routine.items[p.index];
+      return { title: item.title, beforeSec: item.durationSec, afterSec: item.durationSec - p.shortenSec, shortenedSec: p.shortenSec };
+    });
+
+  return {
+    routine: recoveredSec > 0 ? { ...routine, items, updatedAt: new Date().toISOString() } : routine,
+    recoveredSec,
+    changedCount: changes.length,
+    changes,
+  };
+}
+
 export function assignGroupIds(items: Array<{ title: string; type: string }>): string[] {
   const result: string[] = [];
   let currentBase: string | null = null;

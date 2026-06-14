@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getBaseTitle, getExerciseGroupRange, moveGroup, addWorkoutSet, addItem, addPairedWorkoutSet, buildGroups, assignGroupIds } from './routineOperations';
+import { getBaseTitle, getExerciseGroupRange, moveGroup, addWorkoutSet, addItem, addPairedWorkoutSet, buildGroups, assignGroupIds, createRestShorteningPlan } from './routineOperations';
 import { createRoutine } from './routineFactory';
 import type { Routine } from './routineTypes';
 
@@ -502,5 +502,71 @@ describe('assignGroupIds', () => {
     ];
     const ids = assignGroupIds(items);
     expect(new Set(ids).size).toBe(1);
+  });
+});
+
+describe('createRestShorteningPlan', () => {
+  const makeRoutine = (items: Array<{ type: 'workout' | 'interval'; durationSec: number }>): Routine => ({
+    ...createRoutine('テスト'),
+    id: 'r1',
+    items: items.map((item, i) => ({
+      id: `i${i}`,
+      title: item.type === 'interval' ? '休憩' : '種目',
+      type: item.type,
+      durationSec: item.durationSec,
+      voiceText: '',
+    })),
+  });
+
+  it('requiredSec が 0 のとき何も変更しない', () => {
+    const routine = makeRoutine([
+      { type: 'workout', durationSec: 30 },
+      { type: 'interval', durationSec: 30 },
+    ]);
+    const plan = createRestShorteningPlan(routine, 0, 0);
+    expect(plan.recoveredSec).toBe(0);
+    expect(plan.routine).toBe(routine);
+  });
+
+  it('後続の interval を短縮して recoveredSec を返す', () => {
+    const routine = makeRoutine([
+      { type: 'workout', durationSec: 30 },
+      { type: 'interval', durationSec: 60 },
+      { type: 'workout', durationSec: 30 },
+      { type: 'interval', durationSec: 60 },
+    ]);
+    // 30秒短縮要求
+    const plan = createRestShorteningPlan(routine, 0, 30);
+    expect(plan.recoveredSec).toBe(30);
+    expect(plan.changedCount).toBeGreaterThan(0);
+    // 短縮後の interval は MIN_SHORTENED_REST_SEC(15) 以上
+    plan.routine.items
+      .filter((it: { type: string }) => it.type === 'interval')
+      .forEach((it: { durationSec: number }) => expect(it.durationSec).toBeGreaterThanOrEqual(15));
+  });
+
+  it('currentIndex より前の interval は変更しない', () => {
+    const routine = makeRoutine([
+      { type: 'workout', durationSec: 30 },
+      { type: 'interval', durationSec: 60 },
+      { type: 'workout', durationSec: 30 },
+      { type: 'interval', durationSec: 60 },
+    ]);
+    // currentIndex=2（2番目のワークアウト中）
+    const plan = createRestShorteningPlan(routine, 2, 30);
+    // index 1 の interval は変更されない
+    expect(plan.routine.items[1].durationSec).toBe(60);
+  });
+
+  it('短縮しても MIN_SHORTENED_REST_SEC 未満にはならない', () => {
+    const routine = makeRoutine([
+      { type: 'workout', durationSec: 30 },
+      { type: 'interval', durationSec: 20 },
+    ]);
+    // 大量に短縮要求しても 15 秒未満にはならない
+    const plan = createRestShorteningPlan(routine, 0, 9999);
+    plan.routine.items
+      .filter((it: { type: string }) => it.type === 'interval')
+      .forEach((it: { durationSec: number }) => expect(it.durationSec).toBeGreaterThanOrEqual(15));
   });
 });
