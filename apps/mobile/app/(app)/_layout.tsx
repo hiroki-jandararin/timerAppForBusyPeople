@@ -43,8 +43,10 @@ export default function AppLayout() {
       />
       <Stack.Screen name="routines/new" options={{ headerShown: true, title: 'ルーティン作成', headerBackTitle: '戻る' }} />
       <Stack.Screen name="routines/[id]/edit" options={{ headerShown: true, title: 'ルーティン編集', headerBackTitle: '戻る' }} />
+      <Stack.Screen name="routines/create-method" options={{ headerShown: false }} />
       <Stack.Screen name="routines/templates" options={{ headerShown: true, title: 'テンプレート', headerBackTitle: '戻る' }} />
       <Stack.Screen name="history" options={{ headerShown: false }} />
+      <Stack.Screen name="routines/ai-prompt" options={{ headerShown: true, title: 'AIで作成', headerBackTitle: '戻る' }} />
     </Stack>
   );
 }

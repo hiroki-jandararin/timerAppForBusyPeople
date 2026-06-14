@@ -1,5 +1,6 @@
 import RoutineForm from '@/components/RoutineForm';
 import { useAuth } from '@/contexts/AuthContext';
+import { consumePendingAiRoutine } from '@/features/ai/aiRoutineStore';
 import { routineApiClient, type CreateRoutineInput } from '@timeapp/api-client';
 import { ROUTINE_TEMPLATES, createRoutineFromTemplate } from '@timeapp/core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,8 +14,9 @@ export default function NewRoutineScreen() {
 
   const api = routineApiClient({ baseUrl: API_BASE_URL, getToken: () => token });
 
+  const pendingAiRoutine = consumePendingAiRoutine();
   const template = templateId ? ROUTINE_TEMPLATES.find((t) => t.id === templateId) : undefined;
-  const initialValues = template ? createRoutineFromTemplate(template) : undefined;
+  const initialValues = pendingAiRoutine ?? (template ? createRoutineFromTemplate(template) : undefined);
 
   return (
     <RoutineForm

@@ -176,7 +176,7 @@ export default function RoutinesScreen() {
 
       <Pressable
         style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-        onPress={() => router.push('/(app)/routines/templates')}
+        onPress={() => router.push('/(app)/routines/create-method')}
       >
         <Text style={styles.fabText}>＋</Text>
       </Pressable>

@@ -1,6 +1,6 @@
 import { Colors } from '@/constants/colors';
 import type { CreateRoutineInput } from '@timeapp/api-client';
-import { addWorkoutSet, type Routine, type RoutineItem } from '@timeapp/core';
+import { addWorkoutSet, addPairedWorkoutSet, type Routine, type RoutineItem } from '@timeapp/core';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,9 +19,12 @@ type Props = {
   title: string;
   initialValues?: Routine;
   onSubmit: (input: CreateRoutineInput) => Promise<void>;
+  generateAiRoutine?: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
 };
 
 const DURATION_PRESETS = [15, 20, 30, 45, 60, 90, 120];
+const AI_BODY_PARTS = ['胸', '背中', '肩', '腕（前）', '腕（後ろ）', '足（前）', '足（後ろ）', '腹筋', '背筋', 'ふくらはぎ'] as const;
+const AI_DURATION_PRESETS = [10, 15, 20, 30, 45, 60] as const;
 
 function genId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -31,30 +34,60 @@ function emptyItem(): RoutineItem {
   return { id: genId(), type: 'workout', title: '', durationSec: 30, voiceText: '' };
 }
 
-export default function RoutineForm({ title, initialValues, onSubmit }: Props) {
+export default function RoutineForm({ title, initialValues, onSubmit, generateAiRoutine }: Props) {
   const [name, setName] = useState(initialValues?.name ?? '');
   const [items, setItems] = useState<RoutineItem[]>(
     initialValues?.items.length ? initialValues.items : [emptyItem()],
   );
+  const [targetDurationText, setTargetDurationText] = useState(
+    initialValues?.targetDurationSec ? String(Math.floor(initialValues.targetDurationSec / 60)) : ''
+  );
   const [saving, setSaving] = useState(false);
   const [setFormOpen, setSetFormOpen] = useState(false);
+  const [isPairedMode, setIsPairedMode] = useState(false);
   const [setTitle, setSetTitle] = useState('');
   const [setCount, setSetCount] = useState('3');
   const [workoutSec, setWorkoutSec] = useState('60');
   const [intervalSec, setIntervalSec] = useState('90');
+  const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
+  const [aiParts, setAiParts] = useState<string[]>([]);
+  const [aiMinutes, setAiMinutes] = useState<number | null>(null);
+  const [aiExtra, setAiExtra] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
 
   const handleAddWorkoutSet = () => {
     const draftRoutine = { id: '', name, items, createdAt: '', updatedAt: '' };
-    const updated = addWorkoutSet(draftRoutine, {
+    const input = {
       title: setTitle.trim() || 'ワークアウト',
       workoutDurationSec: Number(workoutSec) || 60,
       intervalDurationSec: Number(intervalSec) || 90,
       setCount: Number(setCount) || 3,
       includeLastInterval: false,
-    });
+    };
+    const updated = isPairedMode
+      ? addPairedWorkoutSet(draftRoutine, input)
+      : addWorkoutSet(draftRoutine, input);
     setItems(updated.items);
     setSetTitle('');
     setSetFormOpen(false);
+  };
+
+  const handleAiGenerate = async () => {
+    if (!generateAiRoutine || !aiParts.length || !aiMinutes) return;
+    const prompt = `${aiParts.join('・')}を${aiMinutes}分で鍛えたい。${aiExtra.trim()}`;
+    setIsAiLoading(true);
+    try {
+      const generated = await generateAiRoutine(prompt, aiMinutes * 60);
+      setItems((prev) => [...prev, ...generated.items]);
+      setIsAiPanelOpen(false);
+      setAiParts([]);
+      setAiMinutes(null);
+      setAiExtra('');
+    } catch {
+      Alert.alert('エラー', '生成に失敗しました。もう一度お試しください。');
+    } finally {
+      setIsAiLoading(false);
+    }
   };
 
   const updateItem = (index: number, patch: Partial<RoutineItem>) => {
@@ -108,7 +141,9 @@ export default function RoutineForm({ title, initialValues, onSubmit }: Props) {
     }
     setSaving(true);
     try {
-      await onSubmit({ name: name.trim(), items });
+      const minutes = parseInt(targetDurationText, 10);
+      const targetDurationSec = !isNaN(minutes) && minutes > 0 ? minutes * 60 : null;
+      await onSubmit({ name: name.trim(), items, targetDurationSec });
     } catch {
       Alert.alert('エラー', '保存に失敗しました');
     } finally {
@@ -129,6 +164,17 @@ export default function RoutineForm({ title, initialValues, onSubmit }: Props) {
           placeholderTextColor={Colors.textMuted}
           value={name}
           onChangeText={setName}
+          returnKeyType="done"
+        />
+
+        <Text style={styles.sectionLabel}>目標時間（任意）</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="目標時間（分）"
+          placeholderTextColor={Colors.textMuted}
+          value={targetDurationText}
+          onChangeText={setTargetDurationText}
+          keyboardType="numeric"
           returnKeyType="done"
         />
 
@@ -259,10 +305,84 @@ export default function RoutineForm({ title, initialValues, onSubmit }: Props) {
                 />
               </View>
             </View>
+            <Pressable
+              style={[styles.pairedToggle, isPairedMode && styles.pairedToggleActive]}
+              onPress={() => setIsPairedMode((v) => !v)}
+            >
+              <Text style={[styles.pairedToggleText, isPairedMode && styles.pairedToggleTextActive]}>
+                ペア種目（右/左）
+              </Text>
+            </Pressable>
             <Pressable style={styles.saveBtn} onPress={handleAddWorkoutSet}>
               <Text style={styles.saveBtnText}>追加</Text>
             </Pressable>
           </View>
+        )}
+
+        {generateAiRoutine && (
+          <>
+            <Pressable style={styles.addItemBtn} onPress={() => setIsAiPanelOpen((v) => !v)}>
+              <Text style={styles.addItemText}>AI で追加</Text>
+            </Pressable>
+
+            {isAiPanelOpen && (
+              <View style={styles.aiPanel}>
+                <Text style={styles.aiPanelHeading}>部位</Text>
+                <View style={styles.aiTagRow}>
+                  {AI_BODY_PARTS.map((part) => (
+                    <Pressable
+                      key={part}
+                      onPress={() =>
+                        setAiParts((prev) =>
+                          prev.includes(part) ? prev.filter((p) => p !== part) : [...prev, part]
+                        )
+                      }
+                      style={[styles.aiTag, aiParts.includes(part) && styles.aiTagActive]}
+                    >
+                      <Text style={[styles.aiTagText, aiParts.includes(part) && styles.aiTagTextActive]}>
+                        {part}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Text style={styles.aiPanelHeading}>トータル時間</Text>
+                <View style={styles.aiTagRow}>
+                  {AI_DURATION_PRESETS.map((min) => (
+                    <Pressable
+                      key={min}
+                      onPress={() => setAiMinutes(min)}
+                      style={[styles.aiTag, aiMinutes === min && styles.aiTagActive]}
+                    >
+                      <Text style={[styles.aiTagText, aiMinutes === min && styles.aiTagTextActive]}>
+                        {min}分
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <TextInput
+                  style={[styles.input, { marginTop: 8 }]}
+                  placeholder="追加リクエスト（任意）例: 初心者向け"
+                  placeholderTextColor={Colors.textMuted}
+                  value={aiExtra}
+                  onChangeText={setAiExtra}
+                  returnKeyType="done"
+                />
+
+                <Pressable
+                  style={[styles.saveBtn, { marginTop: 10, opacity: (!aiParts.length || !aiMinutes || isAiLoading) ? 0.4 : 1 }]}
+                  onPress={handleAiGenerate}
+                  disabled={!aiParts.length || !aiMinutes || isAiLoading}
+                >
+                  {isAiLoading
+                    ? <ActivityIndicator color={Colors.text} />
+                    : <Text style={styles.saveBtnText}>生成</Text>
+                  }
+                </Pressable>
+              </View>
+            )}
+          </>
         )}
 
         <Pressable
@@ -350,6 +470,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   addItemText: { color: Colors.orange, fontSize: 14, fontWeight: '600' },
+  pairedToggle: {
+    borderRadius: 10, borderWidth: 1, borderColor: Colors.cardBorder,
+    paddingVertical: 10, alignItems: 'center', marginTop: 8,
+  },
+  pairedToggleActive: { borderColor: Colors.orange, backgroundColor: `${Colors.orange}18` },
+  pairedToggleText: { color: Colors.textMuted, fontSize: 13, fontWeight: '600' },
+  pairedToggleTextActive: { color: Colors.orange },
+  aiPanel: { backgroundColor: '#1E1E21', borderRadius: 14, borderWidth: 1, borderColor: '#818CF830', padding: 14, gap: 8, marginBottom: 8 },
+  aiPanelHeading: { color: '#A0A0A5', fontSize: 11, fontWeight: '900', letterSpacing: 1, marginBottom: 6 },
+  aiTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  aiTag: { backgroundColor: '#2C2C30', borderRadius: 10, borderWidth: 1, borderColor: '#3C3C42', paddingHorizontal: 12, paddingVertical: 6 },
+  aiTagActive: { backgroundColor: '#818CF8', borderColor: '#818CF8' },
+  aiTagText: { color: '#A0A0A5', fontSize: 13, fontWeight: '600' },
+  aiTagTextActive: { color: '#F5F5F5' },
   saveBtn: {
     backgroundColor: Colors.orange,
     borderRadius: 12,

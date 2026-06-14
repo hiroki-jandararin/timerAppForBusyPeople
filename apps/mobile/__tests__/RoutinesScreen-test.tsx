@@ -30,12 +30,12 @@ beforeEach(() => {
 });
 
 describe('RoutinesScreen', () => {
-  it('FABをタップするとテンプレート選択画面へ遷移する', async () => {
+  it('FABをタップすると作成方法選択画面へ遷移する', async () => {
     render(<RoutinesScreen />);
 
     fireEvent.press(await screen.findByText('＋'));
 
-    expect(mockPush).toHaveBeenCalledWith('/(app)/routines/templates');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/routines/create-method');
   });
 
   it('「複製」ボタンをタップするとルーティンが複製される', async () => {
