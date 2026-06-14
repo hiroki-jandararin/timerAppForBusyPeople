@@ -1,6 +1,6 @@
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Pressable, Text } from 'react-native';
 
 function SignOutButton() {
@@ -8,6 +8,15 @@ function SignOutButton() {
   return (
     <Pressable onPress={signOut} hitSlop={8}>
       <Text style={{ color: Colors.textMuted, fontSize: 13 }}>サインアウト</Text>
+    </Pressable>
+  );
+}
+
+function HistoryButton() {
+  const router = useRouter();
+  return (
+    <Pressable onPress={() => router.push('/(app)/history')} hitSlop={8}>
+      <Text style={{ color: Colors.orange, fontSize: 13, fontWeight: '700' }}>履歴</Text>
     </Pressable>
   );
 }
@@ -28,12 +37,14 @@ export default function AppLayout() {
         options={{
           headerShown: true,
           title: 'マイルーティン',
+          headerLeft: () => <HistoryButton />,
           headerRight: () => <SignOutButton />,
         }}
       />
       <Stack.Screen name="routines/new" options={{ headerShown: true, title: 'ルーティン作成', headerBackTitle: '戻る' }} />
       <Stack.Screen name="routines/[id]/edit" options={{ headerShown: true, title: 'ルーティン編集', headerBackTitle: '戻る' }} />
       <Stack.Screen name="routines/templates" options={{ headerShown: true, title: 'テンプレート', headerBackTitle: '戻る' }} />
+      <Stack.Screen name="history" options={{ headerShown: false }} />
     </Stack>
   );
 }

@@ -1,6 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/colors';
-import { routineApiClient } from '@timeapp/api-client';
+import { routineApiClient, workoutHistoryApiClient } from '@timeapp/api-client';
 import type { Routine } from '@timeapp/core';
 import {
   announceForTransition,
@@ -73,12 +73,15 @@ export default function TimerScreen() {
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
   const [hasShownAdjustment, setHasShownAdjustment] = useState(false);
   const plannedStartAtMs = useRef<number | null>(null);
+  const startedAtMsRef = useRef<number | null>(null);
+  const wasManualFinishRef = useRef(false);
   const progressAnim = useRef(new Animated.Value(1)).current;
   const stateRef = useRef(state);
   const voiceService = useRef(new ExpoSpeechVoiceService()).current;
   const wakeLockService = useRef(new ExpoKeepAwakeService()).current;
 
   const api = routineApiClient({ baseUrl: API_BASE_URL, getToken: () => token });
+  const historyApi = workoutHistoryApiClient({ baseUrl: API_BASE_URL, getToken: () => token });
 
   function dispatch(action: TimerAction) {
     const r = activeRoutine ?? routine;
@@ -88,9 +91,17 @@ export default function TimerScreen() {
     if (previous.status === 'idle' && next.status === 'countdown') {
       const start = Date.now() + 3 * 1000;
       plannedStartAtMs.current = start;
+      startedAtMsRef.current = start;
       setPlannedEndAtMs(start + calculateTotalDuration(r) * 1000);
       setHasShownAdjustment(false);
       setIsAdjustmentOpen(false);
+    }
+    if (action.type === 'finish') {
+      wasManualFinishRef.current = true;
+    }
+    if (next.status === 'idle') {
+      startedAtMsRef.current = null;
+      wasManualFinishRef.current = false;
     }
     if (next.status === 'idle' || next.status === 'finished') {
       plannedStartAtMs.current = null;
@@ -186,6 +197,26 @@ export default function TimerScreen() {
       useNativeDriver: false,
     }).start();
   }, [state.currentIndex, state.status]);
+
+  useEffect(() => {
+    if (state.status !== 'finished' || !startedAtMsRef.current) return;
+    const r = activeRoutine ?? routine;
+    if (!r) return;
+    const isManual = wasManualFinishRef.current;
+    const startedAt = startedAtMsRef.current;
+    startedAtMsRef.current = null;
+    wasManualFinishRef.current = false;
+    void historyApi.create({
+      id: crypto.randomUUID(),
+      routineId: r.id,
+      routineName: r.name,
+      startedAt: new Date(startedAt).toISOString(),
+      finishedAt: new Date(Date.now()).toISOString(),
+      completed: !isManual,
+      itemsCount: r.items.length,
+      itemsCompleted: isManual ? state.currentIndex : r.items.length,
+    });
+  }, [state.status]);
 
   if (!routine) {
     return (

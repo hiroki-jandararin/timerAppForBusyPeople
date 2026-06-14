@@ -8,6 +8,7 @@ jest.mock('expo-router', () => ({
 }));
 jest.mock('@timeapp/api-client', () => ({
   routineApiClient: () => ({ getById: mockGetById }),
+  workoutHistoryApiClient: () => ({ create: mockCreateHistory }),
 }));
 jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ token: 'test-token', signOut: jest.fn() }),
@@ -19,6 +20,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 const mockGetById = jest.fn();
+const mockCreateHistory = jest.fn();
 
 const sampleRoutine = {
   id: 'r1',
@@ -160,5 +162,40 @@ describe('TimerScreen — C5 次にやる', () => {
     // かつプッシュアップの次にやるボタンが存在する
     const newDoNextBtns = screen.getAllByText('次にやる');
     expect(newDoNextBtns.length).toBeGreaterThan(0);
+  });
+});
+
+describe('TimerScreen — C8 ワークアウト履歴自動保存', () => {
+  it('「終了する」を押すと completed: false で履歴が保存される', async () => {
+    render(<TimerScreen />);
+    await screen.findByText('スタート');
+    fireEvent.press(screen.getByText('スタート'));
+    await act(async () => { jest.advanceTimersByTime(3500); });
+    fireEvent.press(screen.getByText('終了する'));
+    await act(async () => { jest.advanceTimersByTime(100); });
+    expect(mockCreateHistory).toHaveBeenCalledTimes(1);
+    expect(mockCreateHistory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routineId: 'r1',
+        routineName: 'テストルーティン',
+        completed: false,
+      })
+    );
+  });
+
+  it('タイマーが最後まで完了すると completed: true で履歴が保存される', async () => {
+    render(<TimerScreen />);
+    await screen.findByText('スタート');
+    fireEvent.press(screen.getByText('スタート'));
+    await act(async () => { jest.advanceTimersByTime(3500); }); // カウントダウン完了
+    await act(async () => { jest.advanceTimersByTime(270000); }); // 全アイテム完了
+    expect(mockCreateHistory).toHaveBeenCalledTimes(1);
+    expect(mockCreateHistory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routineId: 'r1',
+        completed: true,
+        itemsCompleted: sampleRoutine.items.length,
+      })
+    );
   });
 });
