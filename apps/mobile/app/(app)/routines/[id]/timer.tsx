@@ -3,10 +3,12 @@ import { Colors } from '@/constants/colors';
 import { routineApiClient } from '@timeapp/api-client';
 import type { Routine } from '@timeapp/core';
 import {
+  announceForTransition,
   initialTimerState,
   timerReducer,
   type TimerAction,
 } from '@timeapp/core';
+import { ExpoSpeechVoiceService } from '@/features/voice/expoSpeechVoiceService';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import {
@@ -40,10 +42,24 @@ export default function TimerScreen() {
   const router = useRouter();
 
   const [routine, setRoutine] = useState<Routine | null>(null);
-  const [state, dispatch] = useReducer(timerReducer, initialTimerState);
+  const [state, rawDispatch] = useReducer(timerReducer, initialTimerState);
   const progressAnim = useRef(new Animated.Value(1)).current;
+  const stateRef = useRef(state);
+  const voiceService = useRef(new ExpoSpeechVoiceService()).current;
 
   const api = routineApiClient({ baseUrl: API_BASE_URL, getToken: () => token });
+
+  function dispatch(action: TimerAction) {
+    if (!routine) { rawDispatch(action); return; }
+    const previous = stateRef.current;
+    const next = timerReducer(previous, action);
+    announceForTransition(previous, next, routine, voiceService);
+    rawDispatch(action);
+  }
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     api.getById(id).then(setRoutine);
