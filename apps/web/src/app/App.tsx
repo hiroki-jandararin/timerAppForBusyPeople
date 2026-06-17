@@ -6,8 +6,8 @@ import type { RoutineRepository } from '@timeapp/core';
 import type { Routine, WorkoutHistory, CreateWorkoutHistoryInput } from '@timeapp/core';
 import { duplicateRoutine } from '@timeapp/core';
 import { GoRoutineRepository } from '../features/routines/goRoutineRepository';
-import { GoWorkoutHistoryRepository } from '../features/workoutHistory/goWorkoutHistoryRepository';
 import { generateAiRoutine } from '../features/ai/aiRoutineService';
+import { GoWorkoutHistoryRepository } from '../features/workoutHistory/goWorkoutHistoryRepository';
 
 type WorkoutHistoryRepository = {
   create: (input: CreateWorkoutHistoryInput) => Promise<WorkoutHistory>;
@@ -31,7 +31,9 @@ export function App() {
       authService={authService}
       createRoutineRepository={() => new GoRoutineRepository(getToken)}
       historyRepository={new GoWorkoutHistoryRepository(getToken)}
-      generateAiRoutine={(prompt, targetDurationSec) => generateAiRoutine(prompt, getToken, targetDurationSec)}
+      generateAiRoutine={(prompt, targetDurationSec) =>
+        generateAiRoutine(prompt, getToken, targetDurationSec)
+      }
     />
   );
 }
@@ -66,7 +68,11 @@ type AppShellProps = {
   generateAiRoutine: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
 };
 
-function AppShell({ createRoutineRepository, historyRepository, generateAiRoutine }: AppShellProps) {
+function AppShell({
+  createRoutineRepository,
+  historyRepository,
+  generateAiRoutine,
+}: AppShellProps) {
   const auth = useAuth();
 
   if (auth.isLoading) {
@@ -96,7 +102,13 @@ type RoutineAppProps = {
   onSignOut: () => Promise<void>;
 };
 
-function RoutineApp({ user, createRoutineRepository, historyRepository, generateAiRoutine, onSignOut }: RoutineAppProps) {
+function RoutineApp({
+  user,
+  createRoutineRepository,
+  historyRepository,
+  generateAiRoutine,
+  onSignOut,
+}: RoutineAppProps) {
   const repository = useMemo(() => createRoutineRepository(user), [createRoutineRepository, user]);
   const voiceService = useMemo<VoiceService>(() => new BrowserVoiceService(), []);
   const wakeLockService = useMemo<WakeLockService>(() => new BrowserWakeLockService(), []);
@@ -137,7 +149,7 @@ function RoutineApp({ user, createRoutineRepository, historyRepository, generate
 
   async function saveHistory(input: CreateWorkoutHistoryInput) {
     const created = await historyRepository.create(input);
-    setHistories(prev => [created, ...prev]);
+    setHistories((prev) => [created, ...prev]);
   }
 
   return (
