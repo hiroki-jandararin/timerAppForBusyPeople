@@ -207,7 +207,7 @@ export function TimerDisplay({
               {/* Timer inside ring */}
               <div className="z-10 grid place-items-center text-center">
                 <p className="m-0 mb-1 text-[0.58rem] font-black tracking-[0.22em] uppercase text-[#A0A0A5]">
-                  {isRest ? 'REST' : isCountdown ? 'READY' : '残り'}
+                  {isRest ? '休憩' : isCountdown ? '準備' : '残り'}
                 </p>
                 <p
                   className={`m-0 font-bebas leading-none tabular-nums${isWarning ? ' pulse-warning' : ''}`}
@@ -519,7 +519,6 @@ export function TimerDisplay({
     </section>
   );
 }
-
 
 function formatSubtextSec(sec: number): string {
   if (sec < 60) return `${sec}秒`;

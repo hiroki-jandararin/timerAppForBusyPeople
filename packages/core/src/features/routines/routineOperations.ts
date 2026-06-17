@@ -6,6 +6,14 @@ export { calculateTotalDuration } from './routineTime';
 
 const nowIso = () => new Date().toISOString();
 
+function generateId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export function renameRoutine(routine: Routine, name: string): Routine {
   return {
     ...routine,
@@ -35,7 +43,7 @@ export function duplicateRoutine(routine: Routine): Routine {
 }
 
 export function addItem(routine: Routine, type: RoutineItemType): Routine {
-  const groupId = `group_${crypto.randomUUID()}`;
+  const groupId = `group_${generateId()}`;
   return {
     ...routine,
     items: [...routine.items, { ...createRoutineItem(type), groupId }],
@@ -56,7 +64,7 @@ export function addWorkoutSet(routine: Routine, input: AddWorkoutSetInput): Rout
   const workoutDurationSec = normalizeDuration(input.workoutDurationSec);
   const intervalDurationSec = normalizeDuration(input.intervalDurationSec);
   const title = input.title.trim() || 'ワークアウト';
-  const groupId = `group_${crypto.randomUUID()}`;
+  const groupId = `group_${generateId()}`;
   const items: RoutineItem[] = [];
 
   for (let index = 0; index < setCount; index += 1) {
@@ -146,7 +154,7 @@ export function addPairedWorkoutSet(routine: Routine, input: AddPairedWorkoutSet
   const workoutDurationSec = normalizeDuration(input.workoutDurationSec);
   const intervalDurationSec = normalizeDuration(input.intervalDurationSec);
   const title = input.title.trim() || 'ワークアウト';
-  const groupId = `group_${crypto.randomUUID()}`;
+  const groupId = `group_${generateId()}`;
   const items: RoutineItem[] = [];
 
   for (let index = 0; index < setCount; index += 1) {
@@ -523,11 +531,11 @@ export function assignGroupIds(items: Array<{ title: string; type: string }>): s
       const base = toGroupBase(item.title);
       if (base !== currentBase) {
         currentBase = base;
-        currentGroupId = `group_${crypto.randomUUID()}`;
+        currentGroupId = `group_${generateId()}`;
       }
       result.push(currentGroupId!);
     } else {
-      result.push(currentGroupId ?? `group_${crypto.randomUUID()}`);
+      result.push(currentGroupId ?? `group_${generateId()}`);
     }
   }
 

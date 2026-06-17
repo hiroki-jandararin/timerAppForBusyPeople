@@ -1,8 +1,5 @@
 import { useState } from 'react';
-import {
-  calculateTotalDuration,
-  formatClockDuration,
-} from '@timeapp/core';
+import { calculateTotalDuration, formatClockDuration } from '@timeapp/core';
 import type { Routine } from '@timeapp/core';
 
 type Props = {
@@ -60,8 +57,7 @@ export function RoutineCard({ routine, onStart, onEdit, onDuplicate, onDelete }:
           <div
             className="pointer-events-none absolute inset-0"
             style={{
-              background:
-                'radial-gradient(ellipse at 75% 50%, #FF6B3520 0%, transparent 65%)',
+              background: 'radial-gradient(ellipse at 75% 50%, #FF6B3520 0%, transparent 65%)',
             }}
           />
 
@@ -78,10 +74,7 @@ export function RoutineCard({ routine, onStart, onEdit, onDuplicate, onDelete }:
               </p>
             </div>
             <div className="mb-1 text-right">
-              <p
-                className="m-0 font-bebas text-3xl leading-none"
-                style={{ color: '#3C3C42' }}
-              >
+              <p className="m-0 font-bebas text-3xl leading-none" style={{ color: '#3C3C42' }}>
                 {routine.items.length}
               </p>
               <p className="m-0 text-[0.55rem] font-black tracking-[0.18em] uppercase text-[#505058]">
@@ -89,7 +82,6 @@ export function RoutineCard({ routine, onStart, onEdit, onDuplicate, onDelete }:
               </p>
             </div>
           </div>
-
         </div>
 
         {/* Start button */}
