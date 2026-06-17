@@ -9,6 +9,9 @@ export default function CreateMethodScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
+      <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
+        <Text style={styles.backIcon}>‹ 戻る</Text>
+      </Pressable>
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>新規作成</Text>
         <Text style={styles.subtitle}>どんな方法で作りますか？</Text>
@@ -56,6 +59,8 @@ export default function CreateMethodScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
+  backBtn: { paddingHorizontal: 16, paddingVertical: 8 },
+  backIcon: { color: Colors.textSub, fontSize: 13, fontWeight: '700' },
   scroll: { padding: 16, paddingBottom: 48 },
   title: { color: Colors.text, fontSize: 34, fontWeight: '900', marginTop: 8 },
   subtitle: { color: '#505058', fontSize: 13, fontWeight: '700', marginTop: 4, marginBottom: 24 },

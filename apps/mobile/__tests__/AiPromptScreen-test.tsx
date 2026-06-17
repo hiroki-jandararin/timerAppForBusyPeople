@@ -89,6 +89,12 @@ describe('AiPromptScreen — A2 AI自動生成画面', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/routines/new');
   });
 
+  it('戻るボタンを押すと前の画面に戻る', () => {
+    render(<AiPromptScreen />);
+    fireEvent.press(screen.getByText('‹ 戻る'));
+    expect(mockBack).toHaveBeenCalled();
+  });
+
   it('生成エラー時にエラーメッセージが表示される', async () => {
     mockGenerateAiRoutine.mockRejectedValueOnce(new Error('failed'));
 

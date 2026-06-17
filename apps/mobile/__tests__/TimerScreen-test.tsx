@@ -99,10 +99,10 @@ describe('TimerScreen — C6 インターバル短縮提案', () => {
     // カウントダウン(3秒)を進める
     await act(async () => { jest.advanceTimersByTime(3500); });
     // タイマーを一時停止して35秒待機（遅延をシミュレート）
-    fireEvent.press(screen.getByText('⏸'));
+    fireEvent.press(screen.getByTestId('play-pause-btn'));
     await act(async () => { jest.advanceTimersByTime(35000); });
     // 再開すると deltaSec >= 30 なので提案が出るはず
-    fireEvent.press(screen.getByText('▶'));
+    fireEvent.press(screen.getByTestId('play-pause-btn'));
     await act(async () => { jest.advanceTimersByTime(100); });
     expect(screen.getByText('休憩を短縮しますか？')).toBeTruthy();
   });
@@ -112,9 +112,9 @@ describe('TimerScreen — C6 インターバル短縮提案', () => {
     await screen.findByText('スタート');
     fireEvent.press(screen.getByText('スタート'));
     await act(async () => { jest.advanceTimersByTime(3500); });
-    fireEvent.press(screen.getByText('⏸'));
+    fireEvent.press(screen.getByTestId('play-pause-btn'));
     await act(async () => { jest.advanceTimersByTime(35000); });
-    fireEvent.press(screen.getByText('▶'));
+    fireEvent.press(screen.getByTestId('play-pause-btn'));
     await act(async () => { jest.advanceTimersByTime(100); });
     fireEvent.press(screen.getByText('短縮する'));
     expect(screen.queryByText('休憩を短縮しますか？')).toBeNull();
@@ -132,9 +132,9 @@ describe('TimerScreen — C7 予定終了時刻・遅延表示', () => {
     await screen.findByText('スタート');
     fireEvent.press(screen.getByText('スタート'));
     await act(async () => { jest.advanceTimersByTime(3500); });
-    fireEvent.press(screen.getByText('⏸'));
+    fireEvent.press(screen.getByTestId('play-pause-btn'));
     await act(async () => { jest.advanceTimersByTime(35000); });
-    fireEvent.press(screen.getByText('▶'));
+    fireEvent.press(screen.getByTestId('play-pause-btn'));
     await act(async () => { jest.advanceTimersByTime(100); });
     expect(screen.getByText(/遅れ/)).toBeTruthy();
   });
@@ -152,10 +152,8 @@ describe('TimerScreen — C5 次にやる', () => {
     const doNextBtns = screen.getAllByText('次にやる');
     fireEvent.press(doNextBtns[doNextBtns.length - 1]);
     // バーピーがプッシュアップより前に来るはず
-    // QUEUE の queueItemTitle Text 要素の順序を確認
     const pushElems = screen.getAllByText('プッシュアップ');
     const burpeeElems = screen.getAllByText('バーピー');
-    // 少なくとも 1 つずつ存在する
     expect(pushElems.length).toBeGreaterThan(0);
     expect(burpeeElems.length).toBeGreaterThan(0);
     // バーピーの次にやるボタンが消えている(直後に来たので upcoming ではない位置に)

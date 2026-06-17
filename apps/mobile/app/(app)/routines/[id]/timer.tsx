@@ -28,7 +28,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Polygon, Rect, Stop } from 'react-native-svg';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
 
@@ -59,6 +59,41 @@ function formatScheduleDifference(seconds: number): string {
   return seconds > 0 ? `${label}遅れ` : `${label}早い`;
 }
 
+function PrevIcon() {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24">
+      <Rect x={3} y={4} width={3.5} height={16} rx={1.5} fill={Colors.textSub} />
+      <Polygon points="20,4 20,20 9,12" fill={Colors.textSub} />
+    </Svg>
+  );
+}
+
+function PlayIcon({ color }: { color: string }) {
+  return (
+    <Svg width={26} height={26} viewBox="0 0 24 24">
+      <Polygon points="6,3 6,21 20,12" fill={color} />
+    </Svg>
+  );
+}
+
+function PauseIcon({ color }: { color: string }) {
+  return (
+    <Svg width={26} height={26} viewBox="0 0 24 24">
+      <Rect x={4} y={3} width={5} height={18} rx={2.5} fill={color} />
+      <Rect x={15} y={3} width={5} height={18} rx={2.5} fill={color} />
+    </Svg>
+  );
+}
+
+function NextIcon() {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24">
+      <Polygon points="4,4 4,20 15,12" fill={Colors.textSub} />
+      <Rect x={17.5} y={4} width={3.5} height={16} rx={1.5} fill={Colors.textSub} />
+    </Svg>
+  );
+}
+
 export default function TimerScreen() {
   const { token } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -85,7 +120,10 @@ export default function TimerScreen() {
 
   function dispatch(action: TimerAction) {
     const r = activeRoutine ?? routine;
-    if (!r) { rawDispatch(action); return; }
+    if (!r) {
+      rawDispatch(action);
+      return;
+    }
     const previous = stateRef.current;
     const next = timerReducer(previous, action);
     if (previous.status === 'idle' && next.status === 'countdown') {
@@ -125,7 +163,9 @@ export default function TimerScreen() {
   function applyRestShortening() {
     if (!activeRoutine || !plannedEndAtMs) return;
     const projectedEnd =
-      nowMs + calculateRemainingRoutineDuration(activeRoutine, state.currentIndex, state.remainingSec) * 1000;
+      nowMs +
+      calculateRemainingRoutineDuration(activeRoutine, state.currentIndex, state.remainingSec) *
+        1000;
     const deltaSec = Math.round((projectedEnd - plannedEndAtMs) / 1000);
     const plan = createRestShorteningPlan(activeRoutine, state.currentIndex, Math.max(0, deltaSec));
     if (plan.recoveredSec > 0) setActiveRoutine(plan.routine);
@@ -151,7 +191,9 @@ export default function TimerScreen() {
     } else {
       void wakeLockService.release();
     }
-    return () => { void wakeLockService.release(); };
+    return () => {
+      void wakeLockService.release();
+    };
   }, [state.status]);
 
   useEffect(() => {
@@ -161,10 +203,13 @@ export default function TimerScreen() {
   }, [state.status]);
 
   useEffect(() => {
-    if (hasShownAdjustment || !activeRoutine || !plannedStartAtMs.current || !plannedEndAtMs) return;
+    if (hasShownAdjustment || !activeRoutine || !plannedStartAtMs.current || !plannedEndAtMs)
+      return;
     if (state.status !== 'running' && state.status !== 'paused') return;
     const projectedEnd =
-      nowMs + calculateRemainingRoutineDuration(activeRoutine, state.currentIndex, state.remainingSec) * 1000;
+      nowMs +
+      calculateRemainingRoutineDuration(activeRoutine, state.currentIndex, state.remainingSec) *
+        1000;
     const deltaSec = Math.round((projectedEnd - plannedEndAtMs) / 1000);
     if (deltaSec < 30) return;
     const plan = createRestShorteningPlan(activeRoutine, state.currentIndex, deltaSec);
@@ -174,7 +219,10 @@ export default function TimerScreen() {
   }, [nowMs, hasShownAdjustment, activeRoutine, plannedEndAtMs, state]);
 
   useEffect(() => {
-    api.getById(id).then((r) => { setRoutine(r); setActiveRoutine(r); });
+    api.getById(id).then((r) => {
+      setRoutine(r);
+      setActiveRoutine(r);
+    });
   }, [id]);
 
   useEffect(() => {
@@ -298,8 +346,7 @@ export default function TimerScreen() {
     outputRange: [RING_CIRCUMFERENCE, 0],
   });
 
-  const overallProgress =
-    ar.items.length > 0 ? (state.currentIndex / ar.items.length) * 100 : 0;
+  const overallProgress = ar.items.length > 0 ? (state.currentIndex / ar.items.length) * 100 : 0;
 
   const isWarning = state.remainingSec > 0 && state.remainingSec <= 3;
   const ringColor = isWarning ? Colors.yellow : accentColor;
@@ -312,7 +359,9 @@ export default function TimerScreen() {
           <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
             <Text style={styles.backIcon}>‹</Text>
           </Pressable>
-          <Text style={styles.routineNameSmall} numberOfLines={1}>{routine.name}</Text>
+          <Text style={styles.routineNameSmall} numberOfLines={1}>
+            {routine.name}
+          </Text>
           <Text style={styles.indexInfo}>
             {state.currentIndex + 1} / {ar.items.length}
           </Text>
@@ -379,12 +428,6 @@ export default function TimerScreen() {
         <Text style={styles.itemTitle} numberOfLines={2}>
           {currentItem?.title ?? ''}
         </Text>
-
-        <Text style={styles.nextLabel}>
-          {ar.items[state.currentIndex + 1]
-            ? `次: ${ar.items[state.currentIndex + 1].title}`
-            : ' '}
-        </Text>
       </View>
 
       {/* 下部: 全体進捗＋コントロール＋終了 */}
@@ -398,40 +441,46 @@ export default function TimerScreen() {
           />
         </View>
 
+        <Text style={styles.nextLabel} numberOfLines={1}>
+          {ar.items[state.currentIndex + 1] ? (
+            <>
+              <Text style={styles.nextLabelPrefix}>次▸ </Text>
+              {ar.items[state.currentIndex + 1].title}
+            </>
+          ) : ' '}
+        </Text>
+
         <View style={styles.controls}>
           <Pressable
             style={({ pressed }) => [styles.ctrlBtn, pressed && { opacity: 0.6 }]}
             onPress={() => send({ type: 'previous', routine: ar })}
           >
-            <Text style={styles.ctrlIcon}>⏮</Text>
+            <PrevIcon />
           </Pressable>
 
           <Pressable
+            testID="play-pause-btn"
             style={({ pressed }) => [
               styles.playBtn,
               { backgroundColor: accentColor },
               pressed && { opacity: 0.8 },
             ]}
-            onPress={() =>
-              send(state.status === 'paused' ? { type: 'resume' } : { type: 'pause' })
-            }
+            onPress={() => send(state.status === 'paused' ? { type: 'resume' } : { type: 'pause' })}
           >
-            <Text style={styles.playBtnIcon}>
-              {state.status === 'paused' ? '▶' : '⏸'}
-            </Text>
+            {state.status === 'paused' ? (
+              <PlayIcon color={Colors.bg} />
+            ) : (
+              <PauseIcon color={Colors.bg} />
+            )}
           </Pressable>
 
           <Pressable
             style={({ pressed }) => [styles.ctrlBtn, pressed && { opacity: 0.6 }]}
             onPress={() => send({ type: 'skip', routine: ar })}
           >
-            <Text style={styles.ctrlIcon}>⏭</Text>
+            <NextIcon />
           </Pressable>
         </View>
-
-        <Pressable style={styles.finishLink} onPress={() => send({ type: 'finish' })}>
-          <Text style={styles.finishLinkText}>終了する</Text>
-        </Pressable>
 
         {/* 短縮提案ダイアログ */}
         {isAdjustmentOpen && (
@@ -442,7 +491,10 @@ export default function TimerScreen() {
               <Pressable onPress={applyRestShortening} style={styles.adjustmentBtnPrimary}>
                 <Text style={styles.adjustmentBtnPrimaryText}>短縮する</Text>
               </Pressable>
-              <Pressable onPress={() => setIsAdjustmentOpen(false)} style={styles.adjustmentBtnSecondary}>
+              <Pressable
+                onPress={() => setIsAdjustmentOpen(false)}
+                style={styles.adjustmentBtnSecondary}
+              >
                 <Text style={styles.adjustmentBtnSecondaryText}>スキップ</Text>
               </Pressable>
             </View>
@@ -453,15 +505,21 @@ export default function TimerScreen() {
         <View style={styles.queue}>
           <Text style={styles.queueLabel}>QUEUE</Text>
           {groups.map((group: ExerciseGroup) => (
-            <View key={group.itemStart} style={[
-              styles.queueItem,
-              group.status === 'current' && styles.queueItemCurrent,
-              group.status === 'done' && styles.queueItemDone,
-            ]}>
-              <Text style={[
-                styles.queueItemTitle,
-                group.status === 'done' && styles.queueItemTitleDone,
-              ]}>
+            <View
+              key={group.itemStart}
+              testID={`queue-item-${group.itemStart}`}
+              style={[
+                styles.queueItem,
+                group.status === 'current' && styles.queueItemCurrent,
+                group.status === 'done' && styles.queueItemDone,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.queueItemTitle,
+                  group.status === 'done' && styles.queueItemTitleDone,
+                ]}
+              >
                 {group.baseTitle}
                 {group.setCount > 1 ? ` × ${group.setCount}` : ''}
               </Text>
@@ -478,6 +536,13 @@ export default function TimerScreen() {
             </View>
           ))}
         </View>
+
+        <Pressable
+          style={({ pressed }) => [styles.finishBtn, pressed && { opacity: 0.7 }]}
+          onPress={() => send({ type: 'finish' })}
+        >
+          <Text style={styles.finishBtnText}>終了する</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -518,7 +583,13 @@ const styles = StyleSheet.create({
   },
   backBtn: { paddingRight: 10, justifyContent: 'center' },
   backIcon: { color: Colors.textSub, fontSize: 28, lineHeight: 32, marginTop: -2 },
-  routineNameSmall: { color: Colors.textSub, fontSize: 14, fontWeight: '600', flex: 1, marginRight: 8 },
+  routineNameSmall: {
+    color: Colors.textSub,
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+    marginRight: 8,
+  },
   indexInfo: { color: Colors.textMuted, fontSize: 14 },
   endTimeLabel: { color: Colors.textMuted, fontSize: 13 },
   delayLabel: { color: '#EF4444', fontSize: 13, fontWeight: '700' },
@@ -526,7 +597,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   ringWrapper: {
     width: 240,
@@ -558,12 +629,17 @@ const styles = StyleSheet.create({
     lineHeight: 30,
   },
   nextLabel: {
-    color: Colors.textMuted,
-    fontSize: 13,
+    color: Colors.textSub,
+    fontSize: 14,
+    fontWeight: '500',
     textAlign: 'center',
   },
+  nextLabelPrefix: {
+    color: Colors.orange,
+    fontWeight: '800',
+  },
   bottomArea: {
-    gap: 20,
+    gap: 12,
   },
   progressTrack: {
     height: 4,
@@ -592,8 +668,14 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   playBtnIcon: { fontSize: 28, color: Colors.bg },
-  finishLink: { alignItems: 'center' },
-  finishLinkText: { color: Colors.textMuted, fontSize: 13 },
+  finishBtn: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EF444466',
+  },
+  finishBtnText: { color: '#EF4444', fontSize: 15, fontWeight: '700' },
   // idle
   routineName: { fontSize: 28, fontWeight: '800', color: Colors.text, textAlign: 'center' },
   routineMeta: { color: Colors.textSub, fontSize: 16 },
@@ -624,26 +706,64 @@ const styles = StyleSheet.create({
   },
   doneBtnText: { color: Colors.bg, fontSize: 16, fontWeight: '700' },
   // adjustment
-  adjustmentCard: { backgroundColor: '#2C2C30', borderRadius: 12, padding: 14, gap: 8, borderWidth: 1, borderColor: Colors.orange + '60' },
+  adjustmentCard: {
+    backgroundColor: '#2C2C30',
+    borderRadius: 12,
+    padding: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: Colors.orange + '60',
+  },
   adjustmentTitle: { color: Colors.text, fontSize: 14, fontWeight: '800' },
   adjustmentSub: { color: Colors.textSub, fontSize: 12 },
   adjustmentBtns: { flexDirection: 'row', gap: 8 },
-  adjustmentBtnPrimary: { flex: 1, backgroundColor: Colors.orange, borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
+  adjustmentBtnPrimary: {
+    flex: 1,
+    backgroundColor: Colors.orange,
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
   adjustmentBtnPrimaryText: { color: Colors.bg, fontSize: 13, fontWeight: '800' },
-  adjustmentBtnSecondary: { flex: 1, borderWidth: 1, borderColor: '#3C3C42', borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
+  adjustmentBtnSecondary: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#3C3C42',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
   adjustmentBtnSecondaryText: { color: Colors.textMuted, fontSize: 13 },
   // queue
-  queue: { gap: 4, marginTop: 4 },
-  queueLabel: { color: Colors.textMuted, fontSize: 10, fontWeight: '900', letterSpacing: 2, marginBottom: 4 },
+  queue: { gap: 4 },
+  queueLabel: {
+    color: Colors.textMuted,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 4,
+  },
   queueItem: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF08', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
-    borderWidth: 1, borderColor: '#3C3C42',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF08',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#3C3C42',
   },
   queueItemCurrent: { backgroundColor: '#FF6B3512', borderColor: '#FF6B3535' },
   queueItemDone: { opacity: 0.4 },
   queueItemTitle: { flex: 1, color: Colors.text, fontSize: 13, fontWeight: '700' },
   queueItemTitleDone: { color: Colors.textMuted },
-  queueBtn: { backgroundColor: Colors.orange, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 },
+  queueBtn: {
+    backgroundColor: Colors.orange,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginLeft: 8,
+  },
   queueBtnText: { color: Colors.bg, fontSize: 11, fontWeight: '800' },
 });

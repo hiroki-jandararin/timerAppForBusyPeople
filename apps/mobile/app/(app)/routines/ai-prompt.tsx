@@ -54,7 +54,7 @@ export default function AiPromptScreen() {
     setIsLoading(true);
     setError(null);
     try {
-      const routine = await generateAiRoutine(token, prompt, selectedMinutes! * 60);
+      const routine = await generateAiRoutine(token ?? '', prompt, selectedMinutes! * 60);
       setPendingAiRoutine(routine);
       router.push('/(app)/routines/new');
     } catch {

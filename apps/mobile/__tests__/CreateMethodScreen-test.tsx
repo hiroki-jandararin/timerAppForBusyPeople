@@ -52,4 +52,10 @@ describe('CreateMethodScreen — A1 作成方法選択', () => {
     fireEvent.press(screen.getByText('最初から作る'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/routines/new');
   });
+
+  it('戻るボタンを押すと前の画面に戻る', () => {
+    render(<CreateMethodScreen />);
+    fireEvent.press(screen.getByText('‹ 戻る'));
+    expect(mockBack).toHaveBeenCalled();
+  });
 });
