@@ -1,4 +1,3 @@
-// app entry point
 import { useEffect, useMemo, useState } from 'react';
 import { AuthProvider, useAuth } from '../features/auth/AuthProvider';
 import { SupabaseAuthService } from '../features/auth/SupabaseAuthService';
