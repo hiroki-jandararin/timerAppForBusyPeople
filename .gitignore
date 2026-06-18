@@ -34,3 +34,7 @@ Thumbs.db
 
 # Vercel
 .vercel/
+
+# Expo local dev files (machine-specific, auto-generated)
+.expo/README.md
+.expo/settings.json
