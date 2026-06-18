@@ -104,7 +104,7 @@ export function createRoutineFromTemplate(template: RoutineTemplate, now = new D
 
 function createTemplateItem(templateItem: RoutineTemplate['items'][number]): RoutineItem {
   return {
-    id: `item_${crypto.randomUUID()}`,
+    id: `item_${'xxxxxxxx'.replace(/x/g, () => ((Math.random() * 16) | 0).toString(16))}_${Date.now()}`,
     type: templateItem.type,
     title: templateItem.title,
     durationSec: templateItem.durationSec,

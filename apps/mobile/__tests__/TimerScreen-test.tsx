@@ -104,7 +104,7 @@ describe('TimerScreen — C6 インターバル短縮提案', () => {
     // 再開すると deltaSec >= 30 なので提案が出るはず
     fireEvent.press(screen.getByTestId('play-pause-btn'));
     await act(async () => { jest.advanceTimersByTime(100); });
-    expect(screen.getByText('休憩を短縮しますか？')).toBeTruthy();
+    expect(screen.getByText('インターバルを短縮しますか？')).toBeTruthy();
   });
 
   it('「短縮する」を押すとダイアログが閉じる', async () => {
@@ -117,7 +117,7 @@ describe('TimerScreen — C6 インターバル短縮提案', () => {
     fireEvent.press(screen.getByTestId('play-pause-btn'));
     await act(async () => { jest.advanceTimersByTime(100); });
     fireEvent.press(screen.getByText('短縮する'));
-    expect(screen.queryByText('休憩を短縮しますか？')).toBeNull();
+    expect(screen.queryByText('インターバルを短縮しますか？')).toBeNull();
   });
 });
 

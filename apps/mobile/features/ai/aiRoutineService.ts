@@ -39,7 +39,7 @@ function toRoutine(generated: GeneratedRoutine, targetDurationSec?: number): Rou
   routine.targetDurationSec = targetDurationSec ?? null;
   const groupIds = assignGroupIds(generated.items);
   routine.items = generated.items.map((item, i) => ({
-    id: `item_${crypto.randomUUID()}`,
+    id: `item_${Math.random().toString(36).slice(2)}_${Date.now()}`,
     type: item.type,
     title: item.title,
     durationSec: item.durationSec,

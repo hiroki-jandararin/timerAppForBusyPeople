@@ -1,6 +1,13 @@
 import type { Routine, RoutineItem, RoutineItemType } from './routineTypes';
 
-const createId = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
+function randomUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+const createId = (prefix: string) => `${prefix}_${randomUUID()}`;
 
 export function createRoutine(name = '', now = new Date()): Routine {
   const timestamp = now.toISOString();

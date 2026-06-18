@@ -255,7 +255,7 @@ export default function TimerScreen() {
     startedAtMsRef.current = null;
     wasManualFinishRef.current = false;
     void historyApi.create({
-      id: crypto.randomUUID(),
+      id: `hist_${'xxxxxxxx'.replace(/x/g, () => ((Math.random() * 16) | 0).toString(16))}_${Date.now()}`,
       routineId: r.id,
       routineName: r.name,
       startedAt: new Date(startedAt).toISOString(),
@@ -416,7 +416,7 @@ export default function TimerScreen() {
           <View style={styles.ringInner}>
             <View style={[styles.itemTypeBadge, { backgroundColor: `${accentColor}20` }]}>
               <Text style={[styles.itemTypeText, { color: accentColor }]}>
-                {isInterval ? '休憩' : '種目'}
+                {isInterval ? 'インターバル' : 'ワークアウト'}
               </Text>
             </View>
             <Text style={[styles.timerDisplay, { color: isWarning ? Colors.yellow : accentColor }]}>
@@ -485,8 +485,8 @@ export default function TimerScreen() {
         {/* 短縮提案ダイアログ */}
         {isAdjustmentOpen && (
           <View style={styles.adjustmentCard}>
-            <Text style={styles.adjustmentTitle}>休憩を短縮しますか？</Text>
-            <Text style={styles.adjustmentSub}>この先の休憩をまとめて短縮できます。</Text>
+            <Text style={styles.adjustmentTitle}>インターバルを短縮しますか？</Text>
+            <Text style={styles.adjustmentSub}>この先のインターバルをまとめて短縮できます。</Text>
             <View style={styles.adjustmentBtns}>
               <Pressable onPress={applyRestShortening} style={styles.adjustmentBtnPrimary}>
                 <Text style={styles.adjustmentBtnPrimaryText}>短縮する</Text>

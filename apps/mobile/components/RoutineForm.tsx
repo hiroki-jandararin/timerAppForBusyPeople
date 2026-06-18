@@ -42,7 +42,16 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
   const [targetDurationText, setTargetDurationText] = useState(
     initialValues?.targetDurationSec ? String(Math.floor(initialValues.targetDurationSec / 60)) : ''
   );
+  const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+
+  const toggleExpand = (id: string) => {
+    setExpandedItemIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
   const [setFormOpen, setSetFormOpen] = useState(false);
   const [isPairedMode, setIsPairedMode] = useState(false);
   const [setTitle, setSetTitle] = useState('');
@@ -67,6 +76,9 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
     const updated = isPairedMode
       ? addPairedWorkoutSet(draftRoutine, input)
       : addWorkoutSet(draftRoutine, input);
+    const existingIds = new Set(items.map((i) => i.id));
+    const newIds = updated.items.filter((i) => !existingIds.has(i.id)).map((i) => i.id);
+    setExpandedItemIds((prev) => new Set([...prev, ...newIds]));
     setItems(updated.items);
     setSetTitle('');
     setSetFormOpen(false);
@@ -78,6 +90,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
     setIsAiLoading(true);
     try {
       const generated = await generateAiRoutine(prompt, aiMinutes * 60);
+      setExpandedItemIds((prev) => new Set([...prev, ...generated.items.map((i) => i.id)]));
       setItems((prev) => [...prev, ...generated.items]);
       setIsAiPanelOpen(false);
       setAiParts([]);
@@ -179,81 +192,102 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
         />
 
         <Text style={styles.sectionLabel}>アイテム</Text>
-        {items.map((item, index) => (
-          <View key={item.id} style={styles.itemCard}>
-            <View style={styles.itemHeader}>
-              <View style={styles.typeToggle}>
-                {(['workout', 'interval'] as const).map((t) => (
-                  <Pressable
-                    key={t}
-                    style={[
-                      styles.typeBtn,
-                      item.type === t && {
-                        backgroundColor: t === 'workout' ? Colors.orange : Colors.green,
-                      },
-                    ]}
-                    onPress={() => updateItem(index, { type: t })}
-                  >
-                    <Text
-                      style={[
-                        styles.typeBtnText,
-                        item.type === t && { color: Colors.bg, fontWeight: '700' },
-                      ]}
-                    >
-                      {t === 'workout' ? '種目' : '休憩'}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <View style={styles.itemControls}>
-                <Pressable onPress={() => moveItemUp(index)} hitSlop={8}>
-                  <Text style={styles.controlText}>↑</Text>
-                </Pressable>
-                <Pressable onPress={() => moveItemDown(index)} hitSlop={8}>
-                  <Text style={styles.controlText}>↓</Text>
-                </Pressable>
-                <Pressable onPress={() => duplicateItem(index)} hitSlop={8}>
-                  <Text style={styles.controlText}>複製</Text>
-                </Pressable>
-                <Pressable onPress={() => removeItem(index)} hitSlop={8}>
-                  <Text style={styles.removeText}>✕</Text>
-                </Pressable>
-              </View>
-            </View>
-
-            <TextInput
-              style={styles.input}
-              placeholder="アイテム名"
-              placeholderTextColor={Colors.textMuted}
-              value={item.title}
-              onChangeText={(v) => updateItem(index, { title: v })}
-              returnKeyType="done"
-            />
-
-            <Text style={styles.fieldLabel}>時間</Text>
-            <View style={styles.presetRow}>
-              {DURATION_PRESETS.map((sec) => (
-                <Pressable
-                  key={sec}
-                  style={[
-                    styles.presetBtn,
-                    item.durationSec === sec && styles.presetBtnActive,
-                  ]}
-                  onPress={() => updateItem(index, { durationSec: sec })}
-                >
-                  <Text
-                    style={[
-                      styles.presetText,
-                      item.durationSec === sec && styles.presetTextActive,
-                    ]}
-                  >
-                    {sec < 60 ? `${sec}秒` : `${sec / 60}分`}
+        {items.map((item, index) => {
+          const isExpanded = expandedItemIds.has(item.id);
+          const durationLabel = item.durationSec < 60 ? `${item.durationSec}秒` : `${item.durationSec / 60}分`;
+          return (
+            <View key={item.id} style={styles.itemCard}>
+              <Pressable style={styles.itemHeader} onPress={() => toggleExpand(item.id)}>
+                <View style={styles.itemSummary}>
+                  <View style={[
+                    styles.typeBadge,
+                    { backgroundColor: item.type === 'workout' ? Colors.orange : Colors.green },
+                  ]}>
+                    <Text style={styles.typeBadgeText}>{item.type === 'workout' ? 'ワークアウト' : 'インターバル'}</Text>
+                  </View>
+                  <Text style={styles.itemSummaryTitle} numberOfLines={1}>
+                    {item.title || 'アイテム名未設定'}
                   </Text>
-                </Pressable>
-              ))}
+                  <Text style={styles.itemSummaryDuration}>{durationLabel}</Text>
+                </View>
+                <View style={styles.itemControls}>
+                  <Pressable onPress={() => moveItemUp(index)} hitSlop={8}>
+                    <Text style={styles.controlText}>↑</Text>
+                  </Pressable>
+                  <Pressable onPress={() => moveItemDown(index)} hitSlop={8}>
+                    <Text style={styles.controlText}>↓</Text>
+                  </Pressable>
+                  <Pressable onPress={() => duplicateItem(index)} hitSlop={8}>
+                    <Text style={styles.controlText}>複製</Text>
+                  </Pressable>
+                  <Pressable onPress={() => removeItem(index)} hitSlop={8}>
+                    <Text style={styles.removeText}>✕</Text>
+                  </Pressable>
+                </View>
+              </Pressable>
+
+              {isExpanded && (
+                <>
+                  <View style={styles.typeToggle}>
+                    {(['workout', 'interval'] as const).map((t) => (
+                      <Pressable
+                        key={t}
+                        style={[
+                          styles.typeBtn,
+                          item.type === t && {
+                            backgroundColor: t === 'workout' ? Colors.orange : Colors.green,
+                          },
+                        ]}
+                        onPress={() => updateItem(index, { type: t })}
+                      >
+                        <Text
+                          style={[
+                            styles.typeBtnText,
+                            item.type === t && { color: Colors.bg, fontWeight: '700' },
+                          ]}
+                        >
+                          {t === 'workout' ? 'ワークアウト' : 'インターバル'}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+
+                  <TextInput
+                    style={styles.input}
+                    placeholder="アイテム名"
+                    placeholderTextColor={Colors.textMuted}
+                    value={item.title}
+                    onChangeText={(v) => updateItem(index, { title: v })}
+                    returnKeyType="done"
+                  />
+
+                  <Text style={styles.fieldLabel}>時間</Text>
+                  <View style={styles.presetRow}>
+                    {DURATION_PRESETS.map((sec) => (
+                      <Pressable
+                        key={sec}
+                        style={[
+                          styles.presetBtn,
+                          item.durationSec === sec && styles.presetBtnActive,
+                        ]}
+                        onPress={() => updateItem(index, { durationSec: sec })}
+                      >
+                        <Text
+                          style={[
+                            styles.presetText,
+                            item.durationSec === sec && styles.presetTextActive,
+                          ]}
+                        >
+                          {sec < 60 ? `${sec}秒` : `${sec / 60}分`}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              )}
             </View>
-          </View>
-        ))}
+          );
+        })}
 
         <Pressable style={styles.addItemBtn} onPress={() => setItems((prev) => [...prev, emptyItem()])}>
           <Text style={styles.addItemText}>＋ アイテムを追加</Text>
@@ -267,7 +301,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
           <View style={styles.setForm}>
             <TextInput
               style={styles.input}
-              placeholder="種目名"
+              placeholder="ワークアウト名"
               placeholderTextColor={Colors.textMuted}
               value={setTitle}
               onChangeText={setSetTitle}
@@ -275,7 +309,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
             />
             <View style={styles.setFormRow}>
               <View style={styles.setFormField}>
-                <Text style={styles.fieldLabel}>種目時間(秒)</Text>
+                <Text style={styles.fieldLabel}>ワークアウト時間(秒)</Text>
                 <TextInput
                   style={styles.input}
                   value={workoutSec}
@@ -285,7 +319,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
                 />
               </View>
               <View style={styles.setFormField}>
-                <Text style={styles.fieldLabel}>休憩時間(秒)</Text>
+                <Text style={styles.fieldLabel}>インターバル時間(秒)</Text>
                 <TextInput
                   style={styles.input}
                   value={intervalSec}
@@ -403,7 +437,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  scroll: { padding: 16, gap: 8, paddingBottom: 48 },
+  scroll: { padding: 16, gap: 4, paddingBottom: 48 },
   sectionLabel: { color: Colors.textSub, fontSize: 13, fontWeight: '600', marginTop: 8, marginBottom: 4 },
   fieldLabel: { color: Colors.textSub, fontSize: 12, marginTop: 8, marginBottom: 4 },
   input: {
@@ -423,9 +457,14 @@ const styles = StyleSheet.create({
     borderColor: Colors.cardBorder,
     padding: 12,
     gap: 6,
-    marginBottom: 8,
+    marginBottom: 2,
   },
-  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  itemSummary: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
+  typeBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
+  typeBadgeText: { fontSize: 12, color: Colors.bg, fontWeight: '700' },
+  itemSummaryTitle: { fontSize: 14, color: Colors.text, fontWeight: '600', flex: 1 },
+  itemSummaryDuration: { fontSize: 13, color: Colors.textSub },
   itemControls: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   controlText: { fontSize: 14, color: Colors.textSub },
   setForm: {

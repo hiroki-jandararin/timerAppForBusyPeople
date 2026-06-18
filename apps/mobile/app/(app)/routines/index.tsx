@@ -3,17 +3,21 @@ import { Colors } from '@/constants/colors';
 import { ApiError, routineApiClient } from '@timeapp/api-client';
 import { duplicateRoutine, type Routine } from '@timeapp/core';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
 
@@ -40,32 +44,71 @@ function RoutineCard({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const swipeableRef = useRef<Swipeable>(null);
+  const menuBtnRef = useRef<View>(null);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+
+  const openMenu = () => {
+    menuBtnRef.current?.measure((_fx, _fy, _w, _h, px, py) => {
+      setMenuPos({ x: px, y: py });
+      setMenuVisible(true);
+    });
+  };
+
+  const renderRightActions = (progress: Animated.AnimatedInterpolation<number>) => {
+    const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1], extrapolate: 'clamp' });
+    return (
+      <Pressable
+        style={styles.deleteAction}
+        onPress={() => {
+          swipeableRef.current?.close();
+          onDelete();
+        }}
+      >
+        <Animated.Text style={[styles.deleteActionText, { transform: [{ scale }] }]}>
+          削除
+        </Animated.Text>
+      </Pressable>
+    );
+  };
+
   return (
-    <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-      onPress={onPress}
-    >
-      <View style={styles.cardAccent} />
-      <View style={styles.cardBody}>
-        <Text style={styles.cardTitle} numberOfLines={1}>
-          {routine.name}
-        </Text>
-        <Text style={styles.cardMeta}>
-          {routine.items.length}種目　{formatDuration(totalSec(routine))}
-        </Text>
-      </View>
-      <View style={styles.cardActions}>
-        <Pressable style={styles.actionBtn} onPress={onEdit} hitSlop={8}>
-          <Text style={styles.actionText}>編集</Text>
+    <Swipeable ref={swipeableRef} renderRightActions={renderRightActions} friction={2} rightThreshold={60}>
+      <Pressable
+        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+        onPress={onPress}
+      >
+        <View style={styles.cardAccent} />
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {routine.name}
+          </Text>
+          <Text style={styles.cardMeta}>
+            {routine.items.length}種目　{formatDuration(totalSec(routine))}
+          </Text>
+        </View>
+        <View ref={menuBtnRef} collapsable={false}>
+          <Pressable style={styles.menuBtn} onPress={openMenu} hitSlop={8}>
+            <Text style={styles.menuDots}>⋮</Text>
+          </Pressable>
+        </View>
+      </Pressable>
+
+      <Modal transparent visible={menuVisible} onRequestClose={() => setMenuVisible(false)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setMenuVisible(false)}>
+          <View style={[styles.menuPopover, { top: menuPos.y - 8, left: menuPos.x - 100 }]}>
+            <Pressable style={styles.menuItem} onPress={() => { setMenuVisible(false); onEdit(); }}>
+              <Text style={styles.menuItemText}>編集</Text>
+            </Pressable>
+            <View style={styles.menuDivider} />
+            <Pressable style={styles.menuItem} onPress={() => { setMenuVisible(false); onDuplicate(); }}>
+              <Text style={styles.menuItemText}>複製</Text>
+            </Pressable>
+          </View>
         </Pressable>
-        <Pressable style={styles.actionBtn} onPress={onDuplicate} hitSlop={8}>
-          <Text style={styles.actionText}>複製</Text>
-        </Pressable>
-        <Pressable style={styles.actionBtn} onPress={onDelete} hitSlop={8}>
-          <Text style={[styles.actionText, { color: Colors.red }]}>削除</Text>
-        </Pressable>
-      </View>
-    </Pressable>
+      </Modal>
+    </Swipeable>
   );
 }
 
@@ -136,7 +179,7 @@ export default function RoutinesScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <FlatList
         data={routines}
         keyExtractor={(r) => r.id}
@@ -181,7 +224,7 @@ export default function RoutinesScreen() {
         <Text style={styles.fabText}>＋</Text>
       </Pressable>
 
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -207,9 +250,25 @@ const styles = StyleSheet.create({
   cardBody: { flex: 1, paddingVertical: 16, paddingHorizontal: 14 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 4 },
   cardMeta: { fontSize: 13, color: Colors.textSub },
-  cardActions: { flexDirection: 'row', gap: 4, paddingRight: 12 },
-  actionBtn: { paddingHorizontal: 8, paddingVertical: 6 },
-  actionText: { fontSize: 13, color: Colors.textSub, fontWeight: '600' },
+  menuBtn: { paddingHorizontal: 14, paddingVertical: 16, justifyContent: 'center', alignItems: 'center' },
+  menuDots: { fontSize: 20, color: Colors.textSub, lineHeight: 22 },
+  menuOverlay: { flex: 1 },
+  menuPopover: {
+    position: 'absolute',
+    backgroundColor: Colors.card,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    minWidth: 120,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  menuItem: { paddingHorizontal: 16, paddingVertical: 12 },
+  menuItemText: { fontSize: 15, color: Colors.text, fontWeight: '500' },
+  menuDivider: { height: 1, backgroundColor: Colors.cardBorder },
   empty: { alignItems: 'center', marginTop: 80, gap: 8 },
   emptyText: { color: Colors.textSub, fontSize: 16 },
   emptySubText: { color: Colors.textMuted, fontSize: 13 },
@@ -233,4 +292,13 @@ const styles = StyleSheet.create({
   },
   fabPressed: { opacity: 0.8 },
   fabText: { color: Colors.text, fontSize: 28, fontWeight: '300', marginTop: -2 },
+  deleteAction: {
+    backgroundColor: Colors.red,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    borderRadius: 16,
+    marginLeft: 8,
+  },
+  deleteActionText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

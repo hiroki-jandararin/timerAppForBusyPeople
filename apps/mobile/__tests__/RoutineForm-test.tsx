@@ -16,6 +16,32 @@ const twoItemRoutine = {
   updatedAt: '2024-01-01T00:00:00Z',
 };
 
+describe('RoutineForm — アイテムカード折りたたみ', () => {
+  it('初期状態でアイテム入力フィールドは非表示', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    expect(screen.queryAllByPlaceholderText('アイテム名').length).toBe(0);
+  });
+
+  it('折りたたみ状態でタイトルがテキストとして表示される', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    expect(screen.getByText('スクワット')).toBeTruthy();
+    expect(screen.getByText('プッシュアップ')).toBeTruthy();
+  });
+
+  it('カードをタップすると入力フィールドが表示される', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('スクワット'));
+    expect(screen.getAllByPlaceholderText('アイテム名').length).toBeGreaterThan(0);
+  });
+
+  it('展開済みカードを再タップすると折りたたまれる', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('スクワット'));
+    fireEvent.press(screen.getByText('スクワット'));
+    expect(screen.queryAllByPlaceholderText('アイテム名').length).toBe(0);
+  });
+});
+
 describe('RoutineForm — アイテム並び替え', () => {
   it('「↑」ボタンが各アイテムカードに存在する', () => {
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
@@ -29,6 +55,10 @@ describe('RoutineForm — アイテム並び替え', () => {
 
   it('2番目のアイテムの「↑」を押すと順番が入れ替わる', () => {
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+
+    // カードを展開してから確認
+    fireEvent.press(screen.getByText('スクワット'));
+    fireEvent.press(screen.getByText('プッシュアップ'));
 
     const upButtons = screen.getAllByText('↑');
     fireEvent.press(upButtons[1]);
@@ -47,17 +77,16 @@ describe('RoutineForm — アイテム複製', () => {
 
   it('「複製」を押すとアイテムが1つ増える', () => {
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
-
     fireEvent.press(screen.getAllByText('複製')[0]);
-
-    expect(screen.getAllByPlaceholderText('アイテム名').length).toBe(3);
+    // 複製されたカードはタイトルテキストで確認
+    expect(screen.getAllByText('スクワット').length).toBe(2);
   });
 
   it('複製されたアイテムは元と同じタイトルを持つ', () => {
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
-
     fireEvent.press(screen.getAllByText('複製')[0]);
-
+    // 全カードを展開して入力値で確認
+    screen.getAllByText('スクワット').forEach((el) => fireEvent.press(el));
     const inputs = screen.getAllByPlaceholderText('アイテム名');
     expect(inputs[0].props.value).toBe('スクワット');
     expect(inputs[1].props.value).toBe('スクワット');
