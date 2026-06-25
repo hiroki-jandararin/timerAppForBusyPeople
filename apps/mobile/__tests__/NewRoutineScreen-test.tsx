@@ -42,6 +42,6 @@ describe('NewRoutineScreen', () => {
 
     render(<NewRoutineScreen />);
 
-    expect(screen.getAllByDisplayValue(template.items[0].title).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(template.items[0].title).length).toBeGreaterThan(0);
   });
 });

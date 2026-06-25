@@ -42,30 +42,16 @@ describe('RoutineForm — アイテムカード折りたたみ', () => {
   });
 });
 
-describe('RoutineForm — アイテム並び替え', () => {
-  it('「↑」ボタンが各アイテムカードに存在する', () => {
+describe('RoutineForm — アイテム並び替え（ドラッグ）', () => {
+  it('「↑」「↓」ボタンは存在しない', () => {
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
-    expect(screen.getAllByText('↑').length).toBe(2);
+    expect(screen.queryAllByText('↑').length).toBe(0);
+    expect(screen.queryAllByText('↓').length).toBe(0);
   });
 
-  it('「↓」ボタンが各アイテムカードに存在する', () => {
+  it('各アイテムカードにドラッグハンドルが表示される', () => {
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
-    expect(screen.getAllByText('↓').length).toBe(2);
-  });
-
-  it('2番目のアイテムの「↑」を押すと順番が入れ替わる', () => {
-    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
-
-    // カードを展開してから確認
-    fireEvent.press(screen.getByText('スクワット'));
-    fireEvent.press(screen.getByText('プッシュアップ'));
-
-    const upButtons = screen.getAllByText('↑');
-    fireEvent.press(upButtons[1]);
-
-    const inputs = screen.getAllByPlaceholderText('アイテム名');
-    expect(inputs[0].props.value).toBe('プッシュアップ');
-    expect(inputs[1].props.value).toBe('スクワット');
+    expect(screen.getAllByTestId('drag-handle').length).toBe(2);
   });
 });
 

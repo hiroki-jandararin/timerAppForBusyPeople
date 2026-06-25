@@ -8,12 +8,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 
 type Props = {
   title: string;
@@ -115,24 +115,6 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const moveItemUp = (index: number) => {
-    if (index === 0) return;
-    setItems((prev) => {
-      const next = [...prev];
-      [next[index - 1], next[index]] = [next[index], next[index - 1]];
-      return next;
-    });
-  };
-
-  const moveItemDown = (index: number) => {
-    setItems((prev) => {
-      if (index >= prev.length - 1) return prev;
-      const next = [...prev];
-      [next[index], next[index + 1]] = [next[index + 1], next[index]];
-      return next;
-    });
-  };
-
   const duplicateItem = (index: number) => {
     setItems((prev) => {
       const copy = { ...prev[index], id: genId() };
@@ -164,273 +146,287 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
     }
   };
 
+  const renderItem = ({ item, drag, isActive }: RenderItemParams<RoutineItem>) => {
+    const index = items.findIndex((i) => i.id === item.id);
+    const isExpanded = expandedItemIds.has(item.id);
+    const durationLabel = item.durationSec < 60 ? `${item.durationSec}秒` : `${item.durationSec / 60}分`;
+    return (
+      <ScaleDecorator>
+        <View style={[styles.itemCard, isActive && { opacity: 0.9 }]}>
+          <View style={styles.itemHeader}>
+            <Pressable style={styles.itemSummary} onPress={() => toggleExpand(item.id)} onLongPress={drag} delayLongPress={150}>
+              <View style={[
+                styles.typeBadge,
+                { backgroundColor: item.type === 'workout' ? Colors.orange : Colors.green },
+              ]}>
+                <Text style={styles.typeBadgeText}>{item.type === 'workout' ? 'ワークアウト' : 'インターバル'}</Text>
+              </View>
+              <Text style={styles.itemSummaryTitle} numberOfLines={1}>
+                {item.title || 'アイテム名未設定'}
+              </Text>
+              <Text style={styles.itemSummaryDuration}>{durationLabel}</Text>
+            </Pressable>
+            <View style={styles.itemControls}>
+              <Pressable onPress={() => duplicateItem(index)} hitSlop={8}>
+                <Text style={styles.controlText}>複製</Text>
+              </Pressable>
+              <Pressable onPress={() => removeItem(index)} hitSlop={8}>
+                <Text style={styles.removeText}>✕</Text>
+              </Pressable>
+              <Pressable onLongPress={drag} delayLongPress={150} hitSlop={8} testID="drag-handle">
+                <Text style={styles.dragHandle}>☰</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {isExpanded && (
+            <>
+              <View style={styles.typeToggle}>
+                {(['workout', 'interval'] as const).map((t) => (
+                  <Pressable
+                    key={t}
+                    style={[
+                      styles.typeBtn,
+                      item.type === t && {
+                        backgroundColor: t === 'workout' ? Colors.orange : Colors.green,
+                      },
+                    ]}
+                    onPress={() => updateItem(index, { type: t })}
+                  >
+                    <Text
+                      style={[
+                        styles.typeBtnText,
+                        item.type === t && { color: Colors.bg, fontWeight: '700' },
+                      ]}
+                    >
+                      {t === 'workout' ? 'ワークアウト' : 'インターバル'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.input}
+                placeholder="アイテム名"
+                placeholderTextColor={Colors.textMuted}
+                value={item.title}
+                onChangeText={(v) => updateItem(index, { title: v })}
+                returnKeyType="done"
+              />
+
+              <Text style={styles.fieldLabel}>時間</Text>
+              <View style={styles.presetRow}>
+                {DURATION_PRESETS.map((sec) => (
+                  <Pressable
+                    key={sec}
+                    style={[
+                      styles.presetBtn,
+                      item.durationSec === sec && styles.presetBtnActive,
+                    ]}
+                    onPress={() => updateItem(index, { durationSec: sec })}
+                  >
+                    <Text
+                      style={[
+                        styles.presetText,
+                        item.durationSec === sec && styles.presetTextActive,
+                      ]}
+                    >
+                      {sec < 60 ? `${sec}秒` : `${sec / 60}分`}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+        </View>
+      </ScaleDecorator>
+    );
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.sectionLabel}>ルーティン名</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="例: 朝トレ10分"
-          placeholderTextColor={Colors.textMuted}
-          value={name}
-          onChangeText={setName}
-          returnKeyType="done"
-        />
-
-        <Text style={styles.sectionLabel}>目標時間（任意）</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="目標時間（分）"
-          placeholderTextColor={Colors.textMuted}
-          value={targetDurationText}
-          onChangeText={setTargetDurationText}
-          keyboardType="numeric"
-          returnKeyType="done"
-        />
-
-        <Text style={styles.sectionLabel}>アイテム</Text>
-        {items.map((item, index) => {
-          const isExpanded = expandedItemIds.has(item.id);
-          const durationLabel = item.durationSec < 60 ? `${item.durationSec}秒` : `${item.durationSec / 60}分`;
-          return (
-            <View key={item.id} style={styles.itemCard}>
-              <Pressable style={styles.itemHeader} onPress={() => toggleExpand(item.id)}>
-                <View style={styles.itemSummary}>
-                  <View style={[
-                    styles.typeBadge,
-                    { backgroundColor: item.type === 'workout' ? Colors.orange : Colors.green },
-                  ]}>
-                    <Text style={styles.typeBadgeText}>{item.type === 'workout' ? 'ワークアウト' : 'インターバル'}</Text>
-                  </View>
-                  <Text style={styles.itemSummaryTitle} numberOfLines={1}>
-                    {item.title || 'アイテム名未設定'}
-                  </Text>
-                  <Text style={styles.itemSummaryDuration}>{durationLabel}</Text>
-                </View>
-                <View style={styles.itemControls}>
-                  <Pressable onPress={() => moveItemUp(index)} hitSlop={8}>
-                    <Text style={styles.controlText}>↑</Text>
-                  </Pressable>
-                  <Pressable onPress={() => moveItemDown(index)} hitSlop={8}>
-                    <Text style={styles.controlText}>↓</Text>
-                  </Pressable>
-                  <Pressable onPress={() => duplicateItem(index)} hitSlop={8}>
-                    <Text style={styles.controlText}>複製</Text>
-                  </Pressable>
-                  <Pressable onPress={() => removeItem(index)} hitSlop={8}>
-                    <Text style={styles.removeText}>✕</Text>
-                  </Pressable>
-                </View>
-              </Pressable>
-
-              {isExpanded && (
-                <>
-                  <View style={styles.typeToggle}>
-                    {(['workout', 'interval'] as const).map((t) => (
-                      <Pressable
-                        key={t}
-                        style={[
-                          styles.typeBtn,
-                          item.type === t && {
-                            backgroundColor: t === 'workout' ? Colors.orange : Colors.green,
-                          },
-                        ]}
-                        onPress={() => updateItem(index, { type: t })}
-                      >
-                        <Text
-                          style={[
-                            styles.typeBtnText,
-                            item.type === t && { color: Colors.bg, fontWeight: '700' },
-                          ]}
-                        >
-                          {t === 'workout' ? 'ワークアウト' : 'インターバル'}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-
-                  <TextInput
-                    style={styles.input}
-                    placeholder="アイテム名"
-                    placeholderTextColor={Colors.textMuted}
-                    value={item.title}
-                    onChangeText={(v) => updateItem(index, { title: v })}
-                    returnKeyType="done"
-                  />
-
-                  <Text style={styles.fieldLabel}>時間</Text>
-                  <View style={styles.presetRow}>
-                    {DURATION_PRESETS.map((sec) => (
-                      <Pressable
-                        key={sec}
-                        style={[
-                          styles.presetBtn,
-                          item.durationSec === sec && styles.presetBtnActive,
-                        ]}
-                        onPress={() => updateItem(index, { durationSec: sec })}
-                      >
-                        <Text
-                          style={[
-                            styles.presetText,
-                            item.durationSec === sec && styles.presetTextActive,
-                          ]}
-                        >
-                          {sec < 60 ? `${sec}秒` : `${sec / 60}分`}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </>
-              )}
-            </View>
-          );
-        })}
-
-        <Pressable style={styles.addItemBtn} onPress={() => setItems((prev) => [...prev, emptyItem()])}>
-          <Text style={styles.addItemText}>＋ アイテムを追加</Text>
-        </Pressable>
-
-        <Pressable style={styles.addItemBtn} onPress={() => setSetFormOpen((v) => !v)}>
-          <Text style={styles.addItemText}>セットを追加</Text>
-        </Pressable>
-
-        {setFormOpen && (
-          <View style={styles.setForm}>
+      <DraggableFlatList
+        data={items}
+        keyExtractor={(item) => item.id}
+        onDragEnd={({ data }) => setItems(data)}
+        renderItem={renderItem}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scroll}
+        ListHeaderComponent={
+          <>
+            <Text style={styles.sectionLabel}>ルーティン名</Text>
             <TextInput
               style={styles.input}
-              placeholder="ワークアウト名"
+              placeholder="例: 朝トレ10分"
               placeholderTextColor={Colors.textMuted}
-              value={setTitle}
-              onChangeText={setSetTitle}
+              value={name}
+              onChangeText={setName}
               returnKeyType="done"
             />
-            <View style={styles.setFormRow}>
-              <View style={styles.setFormField}>
-                <Text style={styles.fieldLabel}>ワークアウト時間(秒)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={workoutSec}
-                  onChangeText={setWorkoutSec}
-                  keyboardType="numeric"
-                  returnKeyType="done"
-                />
-              </View>
-              <View style={styles.setFormField}>
-                <Text style={styles.fieldLabel}>インターバル時間(秒)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={intervalSec}
-                  onChangeText={setIntervalSec}
-                  keyboardType="numeric"
-                  returnKeyType="done"
-                />
-              </View>
-              <View style={styles.setFormField}>
-                <Text style={styles.fieldLabel}>セット数</Text>
-                <TextInput
-                  style={styles.input}
-                  value={setCount}
-                  onChangeText={setSetCount}
-                  keyboardType="numeric"
-                  returnKeyType="done"
-                />
-              </View>
-            </View>
-            <Pressable
-              style={[styles.pairedToggle, isPairedMode && styles.pairedToggleActive]}
-              onPress={() => setIsPairedMode((v) => !v)}
-            >
-              <Text style={[styles.pairedToggleText, isPairedMode && styles.pairedToggleTextActive]}>
-                ペア種目（右/左）
-              </Text>
-            </Pressable>
-            <Pressable style={styles.saveBtn} onPress={handleAddWorkoutSet}>
-              <Text style={styles.saveBtnText}>追加</Text>
-            </Pressable>
-          </View>
-        )}
 
-        {generateAiRoutine && (
+            <Text style={styles.sectionLabel}>目標時間（任意）</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="目標時間（分）"
+              placeholderTextColor={Colors.textMuted}
+              value={targetDurationText}
+              onChangeText={setTargetDurationText}
+              keyboardType="numeric"
+              returnKeyType="done"
+            />
+
+            <Text style={styles.sectionLabel}>アイテム</Text>
+          </>
+        }
+        ListFooterComponent={
           <>
-            <Pressable style={styles.addItemBtn} onPress={() => setIsAiPanelOpen((v) => !v)}>
-              <Text style={styles.addItemText}>AI で追加</Text>
+            <Pressable style={styles.addItemBtn} onPress={() => setItems((prev) => [...prev, emptyItem()])}>
+              <Text style={styles.addItemText}>＋ アイテムを追加</Text>
             </Pressable>
 
-            {isAiPanelOpen && (
-              <View style={styles.aiPanel}>
-                <Text style={styles.aiPanelHeading}>部位</Text>
-                <View style={styles.aiTagRow}>
-                  {AI_BODY_PARTS.map((part) => (
-                    <Pressable
-                      key={part}
-                      onPress={() =>
-                        setAiParts((prev) =>
-                          prev.includes(part) ? prev.filter((p) => p !== part) : [...prev, part]
-                        )
-                      }
-                      style={[styles.aiTag, aiParts.includes(part) && styles.aiTagActive]}
-                    >
-                      <Text style={[styles.aiTagText, aiParts.includes(part) && styles.aiTagTextActive]}>
-                        {part}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+            <Pressable style={styles.addItemBtn} onPress={() => setSetFormOpen((v) => !v)}>
+              <Text style={styles.addItemText}>セットを追加</Text>
+            </Pressable>
 
-                <Text style={styles.aiPanelHeading}>トータル時間</Text>
-                <View style={styles.aiTagRow}>
-                  {AI_DURATION_PRESETS.map((min) => (
-                    <Pressable
-                      key={min}
-                      onPress={() => setAiMinutes(min)}
-                      style={[styles.aiTag, aiMinutes === min && styles.aiTagActive]}
-                    >
-                      <Text style={[styles.aiTagText, aiMinutes === min && styles.aiTagTextActive]}>
-                        {min}分
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
+            {setFormOpen && (
+              <View style={styles.setForm}>
                 <TextInput
-                  style={[styles.input, { marginTop: 8 }]}
-                  placeholder="追加リクエスト（任意）例: 初心者向け"
+                  style={styles.input}
+                  placeholder="種目名"
                   placeholderTextColor={Colors.textMuted}
-                  value={aiExtra}
-                  onChangeText={setAiExtra}
+                  value={setTitle}
+                  onChangeText={setSetTitle}
                   returnKeyType="done"
                 />
-
+                <View style={styles.setFormRow}>
+                  <View style={styles.setFormField}>
+                    <Text style={styles.fieldLabel}>ワークアウト時間(秒)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={workoutSec}
+                      onChangeText={setWorkoutSec}
+                      keyboardType="numeric"
+                      returnKeyType="done"
+                    />
+                  </View>
+                  <View style={styles.setFormField}>
+                    <Text style={styles.fieldLabel}>インターバル時間(秒)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={intervalSec}
+                      onChangeText={setIntervalSec}
+                      keyboardType="numeric"
+                      returnKeyType="done"
+                    />
+                  </View>
+                  <View style={styles.setFormField}>
+                    <Text style={styles.fieldLabel}>セット数</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={setCount}
+                      onChangeText={setSetCount}
+                      keyboardType="numeric"
+                      returnKeyType="done"
+                    />
+                  </View>
+                </View>
                 <Pressable
-                  style={[styles.saveBtn, { marginTop: 10, opacity: (!aiParts.length || !aiMinutes || isAiLoading) ? 0.4 : 1 }]}
-                  onPress={handleAiGenerate}
-                  disabled={!aiParts.length || !aiMinutes || isAiLoading}
+                  style={[styles.pairedToggle, isPairedMode && styles.pairedToggleActive]}
+                  onPress={() => setIsPairedMode((v) => !v)}
                 >
-                  {isAiLoading
-                    ? <ActivityIndicator color={Colors.text} />
-                    : <Text style={styles.saveBtnText}>生成</Text>
-                  }
+                  <Text style={[styles.pairedToggleText, isPairedMode && styles.pairedToggleTextActive]}>
+                    ペア種目（右/左）
+                  </Text>
+                </Pressable>
+                <Pressable style={styles.saveBtn} onPress={handleAddWorkoutSet}>
+                  <Text style={styles.saveBtnText}>追加</Text>
                 </Pressable>
               </View>
             )}
-          </>
-        )}
 
-        <Pressable
-          style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.8 }]}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator color={Colors.text} />
-          ) : (
-            <Text style={styles.saveBtnText}>保存</Text>
-          )}
-        </Pressable>
-      </ScrollView>
+            {generateAiRoutine && (
+              <>
+                <Pressable style={styles.addItemBtn} onPress={() => setIsAiPanelOpen((v) => !v)}>
+                  <Text style={styles.addItemText}>AI で追加</Text>
+                </Pressable>
+
+                {isAiPanelOpen && (
+                  <View style={styles.aiPanel}>
+                    <Text style={styles.aiPanelHeading}>部位</Text>
+                    <View style={styles.aiTagRow}>
+                      {AI_BODY_PARTS.map((part) => (
+                        <Pressable
+                          key={part}
+                          onPress={() =>
+                            setAiParts((prev) =>
+                              prev.includes(part) ? prev.filter((p) => p !== part) : [...prev, part]
+                            )
+                          }
+                          style={[styles.aiTag, aiParts.includes(part) && styles.aiTagActive]}
+                        >
+                          <Text style={[styles.aiTagText, aiParts.includes(part) && styles.aiTagTextActive]}>
+                            {part}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+
+                    <Text style={styles.aiPanelHeading}>トータル時間</Text>
+                    <View style={styles.aiTagRow}>
+                      {AI_DURATION_PRESETS.map((min) => (
+                        <Pressable
+                          key={min}
+                          onPress={() => setAiMinutes(min)}
+                          style={[styles.aiTag, aiMinutes === min && styles.aiTagActive]}
+                        >
+                          <Text style={[styles.aiTagText, aiMinutes === min && styles.aiTagTextActive]}>
+                            {min}分
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+
+                    <TextInput
+                      style={[styles.input, { marginTop: 8 }]}
+                      placeholder="追加リクエスト（任意）例: 初心者向け"
+                      placeholderTextColor={Colors.textMuted}
+                      value={aiExtra}
+                      onChangeText={setAiExtra}
+                      returnKeyType="done"
+                    />
+
+                    <Pressable
+                      style={[styles.saveBtn, { marginTop: 10, opacity: (!aiParts.length || !aiMinutes || isAiLoading) ? 0.4 : 1 }]}
+                      onPress={handleAiGenerate}
+                      disabled={!aiParts.length || !aiMinutes || isAiLoading}
+                    >
+                      {isAiLoading
+                        ? <ActivityIndicator color={Colors.text} />
+                        : <Text style={styles.saveBtnText}>生成</Text>
+                      }
+                    </Pressable>
+                  </View>
+                )}
+              </>
+            )}
+
+            <Pressable
+              style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.8 }]}
+              onPress={handleSave}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color={Colors.text} />
+              ) : (
+                <Text style={styles.saveBtnText}>保存</Text>
+              )}
+            </Pressable>
+          </>
+        }
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -467,6 +463,7 @@ const styles = StyleSheet.create({
   itemSummaryDuration: { fontSize: 13, color: Colors.textSub },
   itemControls: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   controlText: { fontSize: 14, color: Colors.textSub },
+  dragHandle: { fontSize: 18, color: Colors.textSub, paddingHorizontal: 4 },
   setForm: {
     backgroundColor: Colors.card,
     borderRadius: 14,

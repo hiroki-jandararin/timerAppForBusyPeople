@@ -17,7 +17,6 @@ import {
   View,
 } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
 
@@ -179,7 +178,7 @@ export default function RoutinesScreen() {
   }
 
   return (
-    <GestureHandlerRootView style={styles.container}>
+    <View style={styles.container}>
       <FlatList
         data={routines}
         keyExtractor={(r) => r.id}
@@ -224,7 +223,7 @@ export default function RoutinesScreen() {
         <Text style={styles.fabText}>＋</Text>
       </Pressable>
 
-    </GestureHandlerRootView>
+    </View>
   );
 }
 

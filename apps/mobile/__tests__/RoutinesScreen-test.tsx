@@ -42,7 +42,8 @@ describe('RoutinesScreen', () => {
     render(<RoutinesScreen />);
 
     await screen.findByText('テストルーティン');
-    fireEvent.press(screen.getByText('複製'));
+    fireEvent.press(screen.getByText('⋮'));
+    fireEvent.press(await screen.findByText('複製'));
 
     expect(mockCreate).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'テストルーティン コピー' }),

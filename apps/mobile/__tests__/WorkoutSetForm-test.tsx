@@ -33,13 +33,13 @@ describe('RoutineForm — まとめてセット追加', () => {
     expect(screen.getAllByPlaceholderText('アイテム名').length).toBeGreaterThan(0);
   });
 
-  it('3セット分のアイテムが追加される（既存1 + 種目×3 + 休憩×2 = 6アイテム）', () => {
+  it('3セット分のアイテムが追加される（種目×3 + 休憩×2 = 5アイテム展開）', () => {
     render(<RoutineForm title="作成" initialValues={emptyRoutine} onSubmit={jest.fn()} />);
     fireEvent.press(screen.getByText('セットを追加'));
 
     fireEvent.changeText(screen.getByPlaceholderText('種目名'), 'スクワット');
     fireEvent.press(screen.getByText('追加'));
 
-    expect(screen.getAllByPlaceholderText('アイテム名').length).toBe(6);
+    expect(screen.getAllByPlaceholderText('アイテム名').length).toBe(5);
   });
 });
