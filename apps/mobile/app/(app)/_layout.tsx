@@ -3,6 +3,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Stack, useRouter } from 'expo-router';
 import { Pressable, Text } from 'react-native';
 
+function BackButton() {
+  const router = useRouter();
+  return (
+    <Pressable onPress={() => router.back()} hitSlop={12}>
+      <Text style={{ color: Colors.text, fontSize: 17 }}>‹ 戻る</Text>
+    </Pressable>
+  );
+}
+
 function SignOutButton() {
   const { signOut } = useAuth();
   return (
@@ -41,10 +50,10 @@ export default function AppLayout() {
           headerRight: () => <SignOutButton />,
         }}
       />
-      <Stack.Screen name="routines/new" options={{ headerShown: true, title: 'ルーティン作成', headerBackTitle: '戻る' }} />
-      <Stack.Screen name="routines/[id]/edit" options={{ headerShown: true, title: 'ルーティン編集', headerBackTitle: '戻る' }} />
+      <Stack.Screen name="routines/new" options={{ headerShown: true, title: 'ルーティン作成', headerLeft: () => <BackButton /> }} />
+      <Stack.Screen name="routines/[id]/edit" options={{ headerShown: true, title: 'ルーティン編集', headerLeft: () => <BackButton /> }} />
       <Stack.Screen name="routines/create-method" options={{ headerShown: false }} />
-      <Stack.Screen name="routines/templates" options={{ headerShown: true, title: 'テンプレート', headerBackTitle: '戻る' }} />
+      <Stack.Screen name="routines/templates" options={{ headerShown: true, title: 'テンプレート', headerLeft: () => <BackButton /> }} />
       <Stack.Screen name="history" options={{ headerShown: false }} />
       <Stack.Screen name="routines/ai-prompt" options={{ headerShown: false }} />
     </Stack>

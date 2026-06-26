@@ -1,6 +1,6 @@
 import { Colors } from '@/constants/colors';
 import type { CreateRoutineInput } from '@timeapp/api-client';
-import { addWorkoutSet, addPairedWorkoutSet, type Routine, type RoutineItem } from '@timeapp/core';
+import { addWorkoutSet, addPairedWorkoutSet, buildGroups, type Routine, type RoutineItem } from '@timeapp/core';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,6 +14,8 @@ import {
   View,
 } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { Animated } from 'react-native';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 
 type Props = {
   title: string;
@@ -44,6 +46,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
   );
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [viewMode, setViewMode] = useState<'all' | 'set'>('all');
 
   const toggleExpand = (id: string) => {
     setExpandedItemIds((prev) => {
@@ -150,34 +153,34 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
     const index = items.findIndex((i) => i.id === item.id);
     const isExpanded = expandedItemIds.has(item.id);
     const durationLabel = item.durationSec < 60 ? `${item.durationSec}秒` : `${item.durationSec / 60}分`;
+    const renderDeleteAction = (progress: Animated.AnimatedInterpolation<number>) => {
+      const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1], extrapolate: 'clamp' });
+      return (
+        <Pressable style={styles.swipeDeleteAction} onPress={() => removeItem(index)}>
+          <Animated.Text style={[styles.swipeDeleteText, { transform: [{ scale }] }]}>削除</Animated.Text>
+        </Pressable>
+      );
+    };
+
     return (
       <ScaleDecorator>
-        <View style={[styles.itemCard, isActive && { opacity: 0.9 }]}>
-          <View style={styles.itemHeader}>
-            <Pressable style={styles.itemSummary} onPress={() => toggleExpand(item.id)} onLongPress={drag} delayLongPress={150}>
-              <View style={[
-                styles.typeBadge,
-                { backgroundColor: item.type === 'workout' ? Colors.orange : Colors.green },
-              ]}>
-                <Text style={styles.typeBadgeText}>{item.type === 'workout' ? 'ワークアウト' : 'インターバル'}</Text>
-              </View>
-              <Text style={styles.itemSummaryTitle} numberOfLines={1}>
-                {item.title || 'アイテム名未設定'}
-              </Text>
-              <Text style={styles.itemSummaryDuration}>{durationLabel}</Text>
-            </Pressable>
-            <View style={styles.itemControls}>
-              <Pressable onPress={() => duplicateItem(index)} hitSlop={8}>
-                <Text style={styles.controlText}>複製</Text>
+        <Swipeable renderRightActions={renderDeleteAction} friction={2} rightThreshold={60}>
+          <View style={[styles.itemCard, isActive && { opacity: 0.9 }]}>
+            <View style={styles.itemHeader}>
+              <Pressable style={styles.itemSummary} onPress={() => toggleExpand(item.id)} onLongPress={drag} delayLongPress={150}>
+                <View style={[
+                  styles.typeDot,
+                  { backgroundColor: item.type === 'workout' ? Colors.orange : Colors.green },
+                ]} />
+                <Text style={styles.itemSummaryTitle} numberOfLines={1}>
+                  {item.title || 'アイテム名未設定'}
+                </Text>
+                <View style={styles.durationBadge}>
+                  <Text style={styles.durationBadgeText}>{durationLabel}</Text>
+                </View>
               </Pressable>
-              <Pressable onPress={() => removeItem(index)} hitSlop={8}>
-                <Text style={styles.removeText}>✕</Text>
-              </Pressable>
-              <Pressable onLongPress={drag} delayLongPress={150} hitSlop={8} testID="drag-handle">
-                <Text style={styles.dragHandle}>☰</Text>
-              </Pressable>
+              <View testID="drag-handle" />
             </View>
-          </View>
 
           {isExpanded && (
             <>
@@ -236,10 +239,55 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
                   </Pressable>
                 ))}
               </View>
+              <Pressable style={styles.duplicateBtn} onPress={() => duplicateItem(index)}>
+                <Text style={styles.duplicateBtnText}>このアイテムを複製</Text>
+              </Pressable>
             </>
           )}
-        </View>
+          </View>
+        </Swipeable>
       </ScaleDecorator>
+    );
+  };
+
+  const exerciseGroups = buildGroups(items, -1, false);
+  const groupedItemIndices = new Set(exerciseGroups.flatMap((g) => Array.from({ length: g.itemEnd - g.itemStart + 1 }, (_, i) => g.itemStart + i)));
+
+  const renderSetGroup = (startIdx: number) => {
+    const group = exerciseGroups.find((g) => g.itemStart === startIdx);
+    if (!group) return null;
+    const groupItems = items.slice(group.itemStart, group.itemEnd + 1);
+    const workouts = groupItems.filter((i) => i.type === 'workout');
+    const totalSec = group.totalSec;
+    const totalLabel = totalSec < 60 ? `${totalSec}秒` : `${Math.floor(totalSec / 60)}分${totalSec % 60 > 0 ? `${totalSec % 60}秒` : ''}`;
+
+    return (
+      <View style={styles.setGroupCard}>
+        <View style={styles.setGroupHeader}>
+          <View style={styles.setGroupLeft}>
+            <View style={[styles.typeDot, { backgroundColor: Colors.orange }]} />
+            <Text style={styles.setGroupTitle} numberOfLines={1}>{group.baseTitle}</Text>
+          </View>
+          <View style={styles.setGroupMeta}>
+            <Text style={styles.setGroupCount}>{group.setCount}セット</Text>
+            {group.restSec > 0 && (
+              <View style={styles.durationBadge}>
+                <Text style={styles.durationBadgeText}>休憩 {group.restSec}秒</Text>
+              </View>
+            )}
+            <View style={styles.durationBadge}>
+              <Text style={styles.durationBadgeText}>{totalLabel}</Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.setGroupItems}>
+          {workouts.map((w, i) => (
+            <Text key={w.id} style={styles.setGroupItemText}>
+              {i + 1}. {w.title}　{w.durationSec < 60 ? `${w.durationSec}秒` : `${w.durationSec / 60}分`}
+            </Text>
+          ))}
+        </View>
+      </View>
     );
   };
 
@@ -249,10 +297,29 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <DraggableFlatList
-        data={items}
+        data={viewMode === 'set'
+          ? items.filter((_, idx) => !groupedItemIndices.has(idx) || exerciseGroups.some((g) => g.itemStart === idx))
+          : items
+        }
         keyExtractor={(item) => item.id}
-        onDragEnd={({ data }) => setItems(data)}
-        renderItem={renderItem}
+        onDragEnd={({ data }) => {
+          if (viewMode === 'set') return;
+          setItems(data);
+        }}
+        renderItem={(params) => {
+          if (viewMode === 'set') {
+            const idx = items.findIndex((i) => i.id === params.item.id);
+            const group = exerciseGroups.find((g) => g.itemStart === idx);
+            if (group) {
+              return (
+                <ScaleDecorator key={params.item.id}>
+                  {renderSetGroup(idx)}
+                </ScaleDecorator>
+              );
+            }
+          }
+          return renderItem(params);
+        }}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scroll}
         ListHeaderComponent={
@@ -278,7 +345,23 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
               returnKeyType="done"
             />
 
-            <Text style={styles.sectionLabel}>アイテム</Text>
+            <View style={styles.itemsHeader}>
+              <Text style={styles.sectionLabel}>アイテム</Text>
+              <View style={styles.viewToggle}>
+                <Pressable
+                  style={[styles.viewToggleBtn, viewMode === 'all' && styles.viewToggleBtnActive]}
+                  onPress={() => setViewMode('all')}
+                >
+                  <Text style={[styles.viewToggleText, viewMode === 'all' && styles.viewToggleTextActive]}>全表示</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.viewToggleBtn, viewMode === 'set' && styles.viewToggleBtnActive]}
+                  onPress={() => setViewMode('set')}
+                >
+                  <Text style={[styles.viewToggleText, viewMode === 'set' && styles.viewToggleTextActive]}>セット</Text>
+                </Pressable>
+              </View>
+            </View>
           </>
         }
         ListFooterComponent={
@@ -434,7 +517,29 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   scroll: { padding: 16, gap: 4, paddingBottom: 48 },
-  sectionLabel: { color: Colors.textSub, fontSize: 13, fontWeight: '600', marginTop: 8, marginBottom: 4 },
+  sectionLabel: { color: Colors.textSub, fontSize: 13, fontWeight: '600', marginTop: 8, marginBottom: 4, flex: 1 },
+  itemsHeader: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 4 },
+  viewToggle: { flexDirection: 'row', borderRadius: 8, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
+  viewToggleBtn: { paddingHorizontal: 10, paddingVertical: 4 },
+  viewToggleBtnActive: { backgroundColor: Colors.orange },
+  viewToggleText: { fontSize: 12, color: Colors.textSub, fontWeight: '600' },
+  viewToggleTextActive: { color: Colors.bg },
+  setGroupCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    padding: 12,
+    gap: 8,
+    marginBottom: 2,
+  },
+  setGroupHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  setGroupLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
+  setGroupTitle: { fontSize: 14, color: Colors.text, fontWeight: '600', flex: 1 },
+  setGroupMeta: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  setGroupCount: { fontSize: 12, color: Colors.textSub, fontWeight: '700' },
+  setGroupItems: { gap: 2 },
+  setGroupItemText: { fontSize: 12, color: Colors.textSub },
   fieldLabel: { color: Colors.textSub, fontSize: 12, marginTop: 8, marginBottom: 4 },
   input: {
     backgroundColor: Colors.card,
@@ -457,12 +562,27 @@ const styles = StyleSheet.create({
   },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   itemSummary: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
-  typeBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
-  typeBadgeText: { fontSize: 12, color: Colors.bg, fontWeight: '700' },
+  typeDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
   itemSummaryTitle: { fontSize: 14, color: Colors.text, fontWeight: '600', flex: 1 },
-  itemSummaryDuration: { fontSize: 13, color: Colors.textSub },
+  durationBadge: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    flexShrink: 0,
+  },
+  durationBadgeText: { fontSize: 12, color: Colors.textSub },
   itemControls: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  controlText: { fontSize: 14, color: Colors.textSub },
+  duplicateBtn: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  duplicateBtnText: { fontSize: 12, color: Colors.textSub },
   dragHandle: { fontSize: 18, color: Colors.textSub, paddingHorizontal: 4 },
   setForm: {
     backgroundColor: Colors.card,
@@ -484,7 +604,15 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   typeBtnText: { fontSize: 12, color: Colors.textSub },
-  removeText: { color: Colors.red, fontSize: 16 },
+  swipeDeleteAction: {
+    backgroundColor: Colors.red,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    marginBottom: 2,
+    borderRadius: 14,
+  },
+  swipeDeleteText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   presetBtn: {
     paddingHorizontal: 10,

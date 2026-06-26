@@ -1,6 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/colors';
-import { routineApiClient, workoutHistoryApiClient } from '@timeapp/api-client';
+import { routineApiClient, workoutHistoryApiClient, ApiError } from '@timeapp/api-client';
 import type { Routine } from '@timeapp/core';
 import {
   announceForTransition,
@@ -95,7 +95,7 @@ function NextIcon() {
 }
 
 export default function TimerScreen() {
-  const { token } = useAuth();
+  const { token, signOut } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -222,6 +222,9 @@ export default function TimerScreen() {
     api.getById(id).then((r) => {
       setRoutine(r);
       setActiveRoutine(r);
+    }).catch((e) => {
+      if (e instanceof ApiError && e.status === 401) signOut();
+      else router.back();
     });
   }, [id]);
 

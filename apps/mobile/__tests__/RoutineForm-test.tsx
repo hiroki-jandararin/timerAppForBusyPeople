@@ -5,6 +5,18 @@ jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ token: 'test-token' }),
 }));
 
+const setRoutine = {
+  id: 'r2',
+  name: 'セットテスト',
+  items: [
+    { id: 's1', type: 'workout' as const, title: 'スクワット 1', durationSec: 60, voiceText: '', groupId: 'g1' },
+    { id: 's2', type: 'interval' as const, title: '休憩', durationSec: 30, voiceText: '', groupId: 'g1' },
+    { id: 's3', type: 'workout' as const, title: 'スクワット 2', durationSec: 60, voiceText: '', groupId: 'g1' },
+  ],
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+};
+
 const twoItemRoutine = {
   id: 'r1',
   name: 'テスト',
@@ -56,23 +68,26 @@ describe('RoutineForm — アイテム並び替え（ドラッグ）', () => {
 });
 
 describe('RoutineForm — アイテム複製', () => {
-  it('「複製」ボタンが各アイテムカードに存在する', () => {
+  it('カードを展開すると「このアイテムを複製」ボタンが表示される', () => {
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
-    expect(screen.getAllByText('複製').length).toBe(2);
+    fireEvent.press(screen.getByText('スクワット'));
+    expect(screen.getAllByText('このアイテムを複製').length).toBe(1);
   });
 
-  it('「複製」を押すとアイテムが1つ増える', () => {
+  it('「このアイテムを複製」を押すとアイテムが1つ増える', () => {
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
-    fireEvent.press(screen.getAllByText('複製')[0]);
-    // 複製されたカードはタイトルテキストで確認
+    fireEvent.press(screen.getByText('スクワット'));
+    fireEvent.press(screen.getByText('このアイテムを複製'));
     expect(screen.getAllByText('スクワット').length).toBe(2);
   });
 
   it('複製されたアイテムは元と同じタイトルを持つ', () => {
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
-    fireEvent.press(screen.getAllByText('複製')[0]);
-    // 全カードを展開して入力値で確認
-    screen.getAllByText('スクワット').forEach((el) => fireEvent.press(el));
+    // 元カードを開いて複製
+    fireEvent.press(screen.getByText('スクワット'));
+    fireEvent.press(screen.getByText('このアイテムを複製'));
+    // 元カードは展開済み、複製カード（2枚目のスクワット）を開く
+    fireEvent.press(screen.getAllByText('スクワット')[1]);
     const inputs = screen.getAllByPlaceholderText('アイテム名');
     expect(inputs[0].props.value).toBe('スクワット');
     expect(inputs[1].props.value).toBe('スクワット');
@@ -147,6 +162,53 @@ describe('RoutineForm — B3 AI で追加', () => {
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} generateAiRoutine={mockGenerate} />);
     expect(screen.getByText('AI で追加')).toBeTruthy();
   });
+
+const noGroupIdRoutine = {
+  id: 'r3',
+  name: '名前ベーステスト',
+  items: [
+    { id: 'n1', type: 'workout' as const, title: 'スクワット 1', durationSec: 60, voiceText: '' },
+    { id: 'n2', type: 'interval' as const, title: '休憩', durationSec: 30, voiceText: '' },
+    { id: 'n3', type: 'workout' as const, title: 'スクワット 2', durationSec: 60, voiceText: '' },
+  ],
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+};
+
+describe('RoutineForm — 全表示/セット表示トグル', () => {
+  it('初期状態は全表示：個別アイテムが見える', () => {
+    render(<RoutineForm title="編集" initialValues={setRoutine} onSubmit={jest.fn()} />);
+    expect(screen.getByText('スクワット 1')).toBeTruthy();
+    expect(screen.getByText('スクワット 2')).toBeTruthy();
+  });
+
+  it('「セット」ボタンを押すとセットグループが表示される（groupIdあり）', () => {
+    render(<RoutineForm title="編集" initialValues={setRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('セット'));
+    expect(screen.getByText('2セット')).toBeTruthy();
+  });
+
+  it('groupIdがなくても名前ベースでグループ化される', () => {
+    render(<RoutineForm title="編集" initialValues={noGroupIdRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('セット'));
+    expect(screen.getByText('2セット')).toBeTruthy();
+  });
+
+  it('セット表示では個別アイテムタイトルが非表示になる', () => {
+    render(<RoutineForm title="編集" initialValues={setRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('セット'));
+    expect(screen.queryByText('スクワット 1')).toBeNull();
+    expect(screen.queryByText('スクワット 2')).toBeNull();
+  });
+
+  it('セット表示から「全表示」を押すと個別アイテムに戻る', () => {
+    render(<RoutineForm title="編集" initialValues={setRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('セット'));
+    fireEvent.press(screen.getByText('全表示'));
+    expect(screen.getByText('スクワット 1')).toBeTruthy();
+    expect(screen.getByText('スクワット 2')).toBeTruthy();
+  });
+});
 
   it('generateAiRoutine がない場合「AI で追加」は表示されない', () => {
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
