@@ -1,6 +1,7 @@
 import RoutineForm from '@/components/RoutineForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { consumePendingAiRoutine } from '@/features/ai/aiRoutineStore';
+import { emitRoutineChanged } from '@/features/routines/routineEvents';
 import { routineApiClient, type CreateRoutineInput } from '@timeapp/api-client';
 import { ROUTINE_TEMPLATES, createRoutineFromTemplate } from '@timeapp/core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -24,6 +25,7 @@ export default function NewRoutineScreen() {
       initialValues={initialValues}
       onSubmit={async (input: CreateRoutineInput) => {
         await api.create(input);
+        emitRoutineChanged();
         router.back();
       }}
     />
