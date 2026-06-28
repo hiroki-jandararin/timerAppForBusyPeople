@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/hiroki-jandararin/apps/backend/domain"
 	"github.com/hiroki-jandararin/apps/backend/middleware"
 )
@@ -64,6 +65,7 @@ func (h *RoutineHandler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 	if !decodeAndValidate(w, r, &routine) {
 		return
 	}
+	routine.ID = uuid.New().String()
 
 	createdRoutine, err := h.repo.Create(userID, &routine)
 	if err != nil {

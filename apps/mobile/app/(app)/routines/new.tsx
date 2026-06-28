@@ -26,7 +26,7 @@ export default function NewRoutineScreen() {
       onSubmit={async (input: CreateRoutineInput) => {
         await api.create(input);
         emitRoutineChanged();
-        router.back();
+        router.dismissAll();
       }}
     />
   );
