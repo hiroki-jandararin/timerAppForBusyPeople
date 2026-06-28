@@ -241,3 +241,127 @@ describe('RoutineForm — 全表示/セット表示トグル', () => {
     );
   });
 });
+
+describe('RoutineForm — 最後も休憩オプション', () => {
+  it('セット追加フォームに「最後も休憩」チェックボックスが表示される', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('セットを追加'));
+    expect(screen.getByText('最後も休憩')).toBeTruthy();
+  });
+
+  it('「最後も休憩」をONにして追加すると休憩が3つ生成される（3セット）', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('セットを追加'));
+    fireEvent.press(screen.getByText('最後も休憩'));
+    fireEvent.press(screen.getByText('追加'));
+    // 既存2 + workout×3 + interval×3 = 8アイテム
+    expect(screen.getAllByTestId('drag-handle').length).toBe(8);
+  });
+});
+
+describe('RoutineForm — 合計時間・目標差分表示', () => {
+  it('アイテムの合計時間が常に表示される', () => {
+    // twoItemRoutine: 30秒 + 20秒 = 50秒
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    expect(screen.getByText('50秒')).toBeTruthy();
+  });
+
+  it('合計が60秒以上の場合は分で表示される', () => {
+    const routine = {
+      ...twoItemRoutine,
+      items: [
+        { id: 'x1', type: 'workout' as const, title: 'A', durationSec: 60, voiceText: '' },
+        { id: 'x2', type: 'workout' as const, title: 'B', durationSec: 120, voiceText: '' },
+      ],
+    };
+    render(<RoutineForm title="編集" initialValues={routine} onSubmit={jest.fn()} />);
+    expect(screen.getByText('3分')).toBeTruthy();
+  });
+
+  it('目標時間を設定すると差分が表示される（超過）', () => {
+    // 合計50秒、目標1分(60秒) → 目標まで あと 10秒
+    const routine = { ...twoItemRoutine, targetDurationSec: 60 };
+    render(<RoutineForm title="編集" initialValues={routine} onSubmit={jest.fn()} />);
+    expect(screen.getByText('目標まで あと 10秒')).toBeTruthy();
+  });
+
+  it('目標時間を設定すると差分が表示される（余裕あり）', () => {
+    // 合計50秒、目標2分(120秒) → 目標まで あと 70秒
+    const routine = { ...twoItemRoutine, targetDurationSec: 120 };
+    render(<RoutineForm title="編集" initialValues={routine} onSubmit={jest.fn()} />);
+    expect(screen.getByText('目標まで あと 70秒')).toBeTruthy();
+  });
+});
+
+describe('RoutineForm — バリデーションエラー表示', () => {
+  it('ルーティン名が空のまま保存するとエラーメッセージが表示される', async () => {
+    render(<RoutineForm title="作成" onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('保存'));
+    expect(await screen.findByText('ルーティン名を入力してください')).toBeTruthy();
+  });
+
+  it('アイテム名が空のまま保存するとエラーメッセージが表示される', async () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    // スクワットのカードを開いてタイトルを空にする
+    fireEvent.press(screen.getByText('スクワット'));
+    fireEvent.changeText(screen.getAllByPlaceholderText('アイテム名')[0], '');
+    fireEvent.press(screen.getByText('保存'));
+    expect(await screen.findByText('全アイテムのタイトルを入力してください')).toBeTruthy();
+  });
+
+  it('エラーは Alert ではなくインライン表示される', async () => {
+    const mockSubmit = jest.fn();
+    render(<RoutineForm title="作成" onSubmit={mockSubmit} />);
+    fireEvent.press(screen.getByText('保存'));
+    expect(await screen.findByText('ルーティン名を入力してください')).toBeTruthy();
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+});
+
+describe('RoutineForm — セット回数設定', () => {
+  it('セット追加フォームにセット回数の入力フィールドが表示される', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('セットを追加'));
+    expect(screen.getByDisplayValue('3')).toBeTruthy();
+  });
+
+  it('セット回数を2に変えると workout×2 + interval×2 が追加される', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('セットを追加'));
+    fireEvent.changeText(screen.getByDisplayValue('3'), '2');
+    fireEvent.press(screen.getByText('追加'));
+    // 既存2 + workout×2 + interval×1 = 5アイテム（最後も休憩OFF）
+    expect(screen.getAllByTestId('drag-handle').length).toBe(5);
+  });
+
+  it('セット回数を5に変えると workout×5 + interval×4 が追加される', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('セットを追加'));
+    fireEvent.changeText(screen.getByDisplayValue('3'), '5');
+    fireEvent.press(screen.getByText('追加'));
+    // 既存2 + workout×5 + interval×4 = 11アイテム
+    expect(screen.getAllByTestId('drag-handle').length).toBe(11);
+  });
+});
+
+describe('RoutineForm — インターバル単体追加', () => {
+  it('「インターバルを追加」ボタンが存在する', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    expect(screen.getByText('＋ インターバルを追加')).toBeTruthy();
+  });
+
+  it('「インターバルを追加」を押すとインターバルのアイテムが1つ増える', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    const before = screen.getAllByTestId('drag-handle').length;
+    fireEvent.press(screen.getByText('＋ インターバルを追加'));
+    expect(screen.getAllByTestId('drag-handle').length).toBe(before + 1);
+  });
+
+  it('追加したインターバルのカードを開くとタイプがインターバルになっている', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('＋ インターバルを追加'));
+    // 最後のカードを開く（アイテム名未設定が追加される）
+    fireEvent.press(screen.getByText('アイテム名未設定'));
+    expect(screen.getByText('インターバル')).toBeTruthy();
+  });
+});

@@ -36,6 +36,43 @@ function emptyItem(): RoutineItem {
   return { id: genId(), type: 'workout', title: '', durationSec: 30, voiceText: '' };
 }
 
+function emptyInterval(): RoutineItem {
+  return { id: genId(), type: 'interval', title: '', durationSec: 30, voiceText: '' };
+}
+
+function fmtDuration(sec: number): string {
+  return sec < 60 ? `${sec}秒` : `${sec / 60}分`;
+}
+
+function TotalDurationBar({ items, targetDurationSec }: { items: RoutineItem[]; targetDurationSec: number | null }) {
+  const total = items.reduce((s, i) => s + i.durationSec, 0);
+  const diff = targetDurationSec != null ? total - targetDurationSec : null;
+  const diffAbs = diff != null ? Math.abs(diff) : 0;
+  const diffLabel = diff != null
+    ? diff > 0
+      ? `目標より ${diff}秒 オーバー`
+      : diff < 0
+        ? `目標まで あと ${diffAbs}秒`
+        : '目標時間にぴったり'
+    : null;
+  return (
+    <View style={{ backgroundColor: '#1A1A1E', borderRadius: 10, padding: 10, marginTop: 6, gap: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={{ color: Colors.textMuted, fontSize: 11, fontWeight: '600', letterSpacing: 1 }}>アイテム合計時間</Text>
+        <Text style={{ color: Colors.text, fontSize: 15, fontWeight: '700' }}>{fmtDuration(total)}</Text>
+      </View>
+      {diffLabel != null && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ color: Colors.textMuted, fontSize: 11, fontWeight: '600', letterSpacing: 1 }}>目標との差分</Text>
+          <Text style={{ color: diff === 0 ? '#22c55e' : diff! > 0 ? '#EF4444' : '#facc15', fontSize: 13, fontWeight: '600' }}>
+            {diffLabel}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function RoutineForm({ title, initialValues, onSubmit, generateAiRoutine }: Props) {
   const [name, setName] = useState(initialValues?.name ?? '');
   const [items, setItems] = useState<RoutineItem[]>(
@@ -47,6 +84,8 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'set'>('all');
+  const [nameError, setNameError] = useState('');
+  const [itemsError, setItemsError] = useState('');
 
   const toggleExpand = (id: string) => {
     setExpandedItemIds((prev) => {
@@ -57,6 +96,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
   };
   const [setFormOpen, setSetFormOpen] = useState(false);
   const [isPairedMode, setIsPairedMode] = useState(false);
+  const [includeLastInterval, setIncludeLastInterval] = useState(false);
   const [setTitle, setSetTitle] = useState('');
   const [setCount, setSetCount] = useState('3');
   const [workoutSec, setWorkoutSec] = useState('60');
@@ -74,7 +114,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
       workoutDurationSec: Number(workoutSec) || 60,
       intervalDurationSec: Number(intervalSec) || 90,
       setCount: Number(setCount) || 3,
-      includeLastInterval: false,
+      includeLastInterval,
     };
     const updated = isPairedMode
       ? addPairedWorkoutSet(draftRoutine, input)
@@ -127,20 +167,25 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
     });
   };
 
+  const targetDurationSec = (() => {
+    const m = parseInt(targetDurationText, 10);
+    return !isNaN(m) && m > 0 ? m * 60 : null;
+  })();
+
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('', 'ルーティン名を入力してください');
+      setNameError('ルーティン名を入力してください');
       return;
     }
+    setNameError('');
     const invalid = items.find((item) => !item.title.trim());
     if (invalid) {
-      Alert.alert('', '全アイテムのタイトルを入力してください');
+      setItemsError('全アイテムのタイトルを入力してください');
       return;
     }
+    setItemsError('');
     setSaving(true);
     try {
-      const minutes = parseInt(targetDurationText, 10);
-      const targetDurationSec = !isNaN(minutes) && minutes > 0 ? minutes * 60 : null;
       await onSubmit({ name: name.trim(), items, targetDurationSec });
     } catch {
       Alert.alert('エラー', '保存に失敗しました');
@@ -325,6 +370,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
         ListHeaderComponent={
           <>
             <Text style={styles.sectionLabel}>ルーティン名</Text>
+            {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
             <TextInput
               style={styles.input}
               placeholder="例: 朝トレ10分"
@@ -344,7 +390,9 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
               keyboardType="numeric"
               returnKeyType="done"
             />
+            <TotalDurationBar items={items} targetDurationSec={targetDurationSec} />
 
+            {itemsError ? <Text style={styles.errorText}>{itemsError}</Text> : null}
             <View style={styles.itemsHeader}>
               <Text style={styles.sectionLabel}>アイテム</Text>
               <View style={styles.viewToggle}>
@@ -368,6 +416,10 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
           <>
             <Pressable style={styles.addItemBtn} onPress={() => setItems((prev) => [...prev, emptyItem()])}>
               <Text style={styles.addItemText}>＋ アイテムを追加</Text>
+            </Pressable>
+
+            <Pressable style={styles.addItemBtn} onPress={() => setItems((prev) => [...prev, emptyInterval()])}>
+              <Text style={styles.addItemText}>＋ インターバルを追加</Text>
             </Pressable>
 
             <Pressable style={styles.addItemBtn} onPress={() => setSetFormOpen((v) => !v)}>
@@ -422,6 +474,14 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
                 >
                   <Text style={[styles.pairedToggleText, isPairedMode && styles.pairedToggleTextActive]}>
                     ペア種目（右/左）
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.pairedToggle, includeLastInterval && styles.pairedToggleActive]}
+                  onPress={() => setIncludeLastInterval((v) => !v)}
+                >
+                  <Text style={[styles.pairedToggleText, includeLastInterval && styles.pairedToggleTextActive]}>
+                    最後も休憩
                   </Text>
                 </Pressable>
                 <Pressable style={styles.saveBtn} onPress={handleAddWorkoutSet}>
@@ -656,4 +716,5 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   saveBtnText: { color: Colors.text, fontSize: 16, fontWeight: '700' },
+  errorText: { color: '#EF4444', fontSize: 12, marginBottom: 4 },
 });
