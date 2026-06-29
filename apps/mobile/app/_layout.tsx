@@ -11,7 +11,8 @@ function Guard() {
 
   useEffect(() => {
     if (isLoading) return;
-    const inAuthGroup = segments[0] === 'sign-in';
+    const inAuthGroup = segments[0] === 'sign-in' || segments[0] === 'auth';
+    console.log('Guard:', { token: token?.slice(0, 10), isLoading, inAuthGroup, segments });
     if (!token && !inAuthGroup) {
       router.replace('/sign-in');
     } else if (token && inAuthGroup) {
