@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/colors';
+import CalendarHeatmap from '@/components/CalendarHeatmap';
 import { workoutHistoryApiClient, ApiError } from '@timeapp/api-client';
 import type { WorkoutHistory } from '@timeapp/core';
 import { useRouter } from 'expo-router';
@@ -159,6 +160,11 @@ export default function HistoryScreen() {
               <Text style={styles.statLabel}>今月の回数</Text>
             </View>
           </View>
+
+          {/* カレンダーヒートマップ */}
+          <CalendarHeatmap
+            markedDates={histories.map((h) => h.startedAt.slice(0, 10))}
+          />
 
           {histories.length === 0 && (
             <View style={styles.emptyState}>

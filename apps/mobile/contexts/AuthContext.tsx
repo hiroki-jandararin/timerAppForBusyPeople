@@ -24,14 +24,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (newToken: string) => {
-    try {
-      await SecureStore.setItemAsync(TOKEN_KEY, newToken);
-      console.log('SecureStore saved OK');
-    } catch (e) {
-      console.error('SecureStore save failed:', e);
-    }
+    await SecureStore.setItemAsync(TOKEN_KEY, newToken);
     setToken(newToken);
-    console.log('token set:', newToken);
   };
 
   const signOut = async () => {

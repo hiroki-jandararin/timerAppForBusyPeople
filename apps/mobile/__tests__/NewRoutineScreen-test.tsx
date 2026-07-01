@@ -50,15 +50,39 @@ describe('NewRoutineScreen', () => {
     expect(screen.getAllByText(template.items[0].title).length).toBeGreaterThan(0);
   });
 
-  it('保存後に dismissAll でマイルーティン画面へ戻る', async () => {
+  it('目標時間未入力で保存するとエラーメッセージが表示される', async () => {
     const template = ROUTINE_TEMPLATES[0];
     (useLocalSearchParams as jest.Mock).mockReturnValue({ templateId: template.id });
 
     render(<NewRoutineScreen />);
     fireEvent.press(screen.getByText('保存'));
 
+    expect(await screen.findByText('目標時間を設定してください')).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('目標時間を入力して保存すると dismissAll でマイルーティン画面へ戻る', async () => {
+    const template = ROUTINE_TEMPLATES[0];
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ templateId: template.id });
+
+    render(<NewRoutineScreen />);
+    fireEvent.changeText(screen.getByPlaceholderText('目標時間（分）'), '20');
+    fireEvent.press(screen.getByText('保存'));
+
     await screen.findByText('保存');
     expect(mockCreate).toHaveBeenCalled();
     expect(mockDismissAll).toHaveBeenCalled();
+  });
+
+  it('目標時間エラー表示後に入力するとエラーが消える', async () => {
+    const template = ROUTINE_TEMPLATES[0];
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ templateId: template.id });
+
+    render(<NewRoutineScreen />);
+    fireEvent.press(screen.getByText('保存'));
+    expect(await screen.findByText('目標時間を設定してください')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByPlaceholderText('目標時間（分）'), '20');
+    expect(screen.queryByText('目標時間を設定してください')).toBeNull();
   });
 });

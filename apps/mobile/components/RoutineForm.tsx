@@ -86,6 +86,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
   const [viewMode, setViewMode] = useState<'all' | 'set'>('all');
   const [nameError, setNameError] = useState('');
   const [itemsError, setItemsError] = useState('');
+  const [targetDurationError, setTargetDurationError] = useState('');
 
   const toggleExpand = (id: string) => {
     setExpandedItemIds((prev) => {
@@ -178,6 +179,11 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
       return;
     }
     setNameError('');
+    if (!targetDurationSec) {
+      setTargetDurationError('目標時間を設定してください');
+      return;
+    }
+    setTargetDurationError('');
     const invalid = items.find((item) => !item.title.trim());
     if (invalid) {
       setItemsError('全アイテムのタイトルを入力してください');
@@ -386,11 +392,12 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
               placeholder="目標時間（分）"
               placeholderTextColor={Colors.textMuted}
               value={targetDurationText}
-              onChangeText={setTargetDurationText}
+              onChangeText={(v) => { setTargetDurationText(v); setTargetDurationError(''); }}
               keyboardType="numeric"
               returnKeyType="done"
             />
             <TotalDurationBar items={items} targetDurationSec={targetDurationSec} />
+            {targetDurationError ? <Text style={styles.errorText}>{targetDurationError}</Text> : null}
 
             {itemsError ? <Text style={styles.errorText}>{itemsError}</Text> : null}
             <View style={styles.itemsHeader}>

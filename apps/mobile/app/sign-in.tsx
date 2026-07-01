@@ -16,8 +16,7 @@ const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 async function signInWithEmail(email: string, password: string): Promise<string> {
-  console.log('signIn URL:', SUPABASE_URL);
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
     body: JSON.stringify({ email, password }),
