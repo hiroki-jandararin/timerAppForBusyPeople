@@ -117,14 +117,12 @@ describe('RoutineForm — B1 目標時間設定', () => {
     );
   });
 
-  it('目標時間が空の場合 targetDurationSec は null になる', async () => {
-    const mockSubmit = jest.fn().mockResolvedValue(undefined);
+  it('目標時間が空の場合はエラーメッセージが表示されて保存されない', async () => {
+    const mockSubmit = jest.fn();
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={mockSubmit} />);
     fireEvent.press(screen.getByText('保存'));
-    await screen.findByText('保存');
-    expect(mockSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ targetDurationSec: null })
-    );
+    expect(await screen.findByText('目標時間を設定してください')).toBeTruthy();
+    expect(mockSubmit).not.toHaveBeenCalled();
   });
 });
 
@@ -302,7 +300,8 @@ describe('RoutineForm — バリデーションエラー表示', () => {
 
   it('アイテム名が空のまま保存するとエラーメッセージが表示される', async () => {
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
-    // スクワットのカードを開いてタイトルを空にする
+    // 目標時間を入力してからアイテム名を空にして保存
+    fireEvent.changeText(screen.getByPlaceholderText('目標時間（分）'), '10');
     fireEvent.press(screen.getByText('スクワット'));
     fireEvent.changeText(screen.getAllByPlaceholderText('アイテム名')[0], '');
     fireEvent.press(screen.getByText('保存'));

@@ -15,6 +15,12 @@ jest.mock('@/contexts/AuthContext', () => ({
 }));
 jest.mock('expo-speech');
 jest.mock('expo-keep-awake');
+jest.mock('expo-av', () => ({
+  Audio: {
+    Sound: { createAsync: jest.fn().mockResolvedValue({ sound: { playAsync: jest.fn(), stopAsync: jest.fn(), unloadAsync: jest.fn() } }) },
+    setAudioModeAsync: jest.fn(),
+  },
+}));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 44, bottom: 0, left: 0, right: 0 }),
 }));

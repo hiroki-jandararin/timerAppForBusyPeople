@@ -17,10 +17,12 @@ import {
 } from '@timeapp/core';
 import { ExpoSpeechVoiceService } from '@/features/voice/expoSpeechVoiceService';
 import { ExpoKeepAwakeService } from '@/features/wakeLock/expoKeepAwakeService';
+import { SilentAudioService } from '@/features/backgroundTimer/silentAudioService';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Animated,
   Pressable,
   StyleSheet,
@@ -114,6 +116,9 @@ export default function TimerScreen() {
   const stateRef = useRef(state);
   const voiceService = useRef(new ExpoSpeechVoiceService()).current;
   const wakeLockService = useRef(new ExpoKeepAwakeService()).current;
+  const silentAudio = useRef(new SilentAudioService()).current;
+  const suppressVoiceRef = useRef(false);
+  const lastTickAtRef = useRef<number | null>(null);
 
   const api = routineApiClient({ baseUrl: API_BASE_URL, getToken: () => token });
   const historyApi = workoutHistoryApiClient({ baseUrl: API_BASE_URL, getToken: () => token });
@@ -130,9 +135,11 @@ export default function TimerScreen() {
       const start = Date.now() + 3 * 1000;
       plannedStartAtMs.current = start;
       startedAtMsRef.current = start;
-      setPlannedEndAtMs(start + calculateTotalDuration(r) * 1000);
+      const endMs = start + calculateTotalDuration(r) * 1000;
+      setPlannedEndAtMs(endMs);
       setHasShownAdjustment(false);
       setIsAdjustmentOpen(false);
+      void silentAudio.start();
     }
     if (action.type === 'finish') {
       wasManualFinishRef.current = true;
@@ -146,8 +153,11 @@ export default function TimerScreen() {
       setPlannedEndAtMs(null);
       setIsAdjustmentOpen(false);
       setHasShownAdjustment(false);
+      void silentAudio.stop();
     }
-    announceForTransition(previous, next, r, voiceService);
+    if (!suppressVoiceRef.current) {
+      announceForTransition(previous, next, r, voiceService);
+    }
     rawDispatch(action);
   }
 
@@ -231,11 +241,31 @@ export default function TimerScreen() {
   useEffect(() => {
     if (state.status !== 'running' && state.status !== 'countdown') return;
     const interval = setInterval(() => {
+      lastTickAtRef.current = Date.now();
       const r = activeRoutine ?? routine;
       if (r) dispatch({ type: 'tick', routine: r });
     }, 1000);
     return () => clearInterval(interval);
   }, [state.status, activeRoutine, routine]);
+
+  // 前台復帰時にバックグラウンド中の経過分を補完
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState !== 'active') return;
+      if (stateRef.current.status !== 'running') return;
+      if (!lastTickAtRef.current) return;
+      const elapsed = Math.floor((Date.now() - lastTickAtRef.current) / 1000);
+      if (elapsed < 2) return;
+      const r = activeRoutine ?? routine;
+      if (!r) return;
+      suppressVoiceRef.current = true;
+      for (let i = 0; i < elapsed - 1; i++) {
+        dispatch({ type: 'tick', routine: r });
+      }
+      suppressVoiceRef.current = false;
+    });
+    return () => sub.remove();
+  }, [activeRoutine, routine]);
 
   useEffect(() => {
     if (!routine || state.status !== 'running') return;
