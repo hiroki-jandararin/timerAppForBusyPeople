@@ -23,10 +23,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   AppState,
   Animated,
   PanResponder,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -102,7 +104,9 @@ function NextIcon() {
 }
 
 // ─── QueueList ────────────────────────────────────────────────────────────────
-// DraggableFlatListの代替。PanResponderで安定したドラッグ並び替えを実現する。
+// Animated.Valueで各スロットのtopを管理し、ドラッグをスムーズにアニメーションする。
+
+const SPRING_CFG = { tension: 300, friction: 30, useNativeDriver: false } as const;
 
 type QueueListProps = {
   groups: ExerciseGroup[];
@@ -111,59 +115,105 @@ type QueueListProps = {
 };
 
 function QueueList({ groups, onDragEnd, renderItem }: QueueListProps) {
+  const STEP = QUEUE_ITEM_H + QUEUE_GAP;
+
+  // スロットごとのtop位置アニメーション（インデックス順に管理）
+  const animTops = useRef<Animated.Value[]>([]);
+  while (animTops.current.length < groups.length) {
+    animTops.current.push(new Animated.Value(animTops.current.length * STEP));
+  }
+
+  // ドラッグ中のアイテム専用アニメーション（指に直追従）
+  const activeTopAnim = useRef(new Animated.Value(0)).current;
+
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
-  const [overIdx, setOverIdx] = useState<number | null>(null);
   const activeRef = useRef<number | null>(null);
   const overRef = useRef<number | null>(null);
-  const groupsRef = useRef<ExerciseGroup[]>(groups);
-  const onDragEndRef = useRef<(g: ExerciseGroup[]) => void>(onDragEnd);
+  const groupsRef = useRef(groups);
+  const onDragEndRef = useRef(onDragEnd);
   const containerRef = useRef<View>(null);
-  const containerTopRef = useRef<number>(0);
+  const containerTopRef = useRef(0);
   groupsRef.current = groups;
   onDragEndRef.current = onDragEnd;
 
-  const STEP = QUEUE_ITEM_H + QUEUE_GAP;
+  // グループ変更後（並び替え完了後）に全スロットを正規位置にリセット
+  useEffect(() => {
+    if (activeRef.current !== null) return;
+    groups.forEach((_, i) => animTops.current[i]?.setValue(i * STEP));
+  }, [groups]);
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => activeRef.current !== null,
+      onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: () => activeRef.current !== null,
       onPanResponderMove: (_, gs) => {
-        if (activeRef.current === null) return;
+        const aIdx = activeRef.current;
+        if (aIdx === null) return;
+
+        // ドラッグアイテムを指に追従させる
+        activeTopAnim.setValue(aIdx * STEP + gs.dy);
+
+        // ホバー先スロットを計算
         const all = groupsRef.current;
         const firstUp = all.findIndex((g) => g.status === 'upcoming');
         const relY = gs.moveY - containerTopRef.current;
-        const raw = Math.floor(relY / STEP);
-        const clamped = Math.max(firstUp >= 0 ? firstUp : 0, Math.min(all.length - 1, raw));
-        if (clamped !== overRef.current) {
-          overRef.current = clamped;
-          setOverIdx(clamped);
-        }
+        const clamped = Math.max(
+          firstUp >= 0 ? firstUp : 0,
+          Math.min(all.length - 1, Math.floor(relY / STEP))
+        );
+        if (clamped === overRef.current) return;
+        overRef.current = clamped;
+
+        // 他アイテムをスプリングでスライド
+        all.forEach((_, i) => {
+          if (i === aIdx) return;
+          const anim = animTops.current[i];
+          if (!anim) return;
+          let target: number;
+          if (aIdx < clamped) {
+            target = i > aIdx && i <= clamped ? (i - 1) * STEP : i * STEP;
+          } else {
+            target = i >= clamped && i < aIdx ? (i + 1) * STEP : i * STEP;
+          }
+          Animated.spring(anim, { toValue: target, ...SPRING_CFG }).start();
+        });
       },
+
       onPanResponderRelease: () => {
         const from = activeRef.current;
         const to = overRef.current;
-        // refを先にリセット: 新グループで activeIdx が残ると位置計算が狂う
         activeRef.current = null;
         overRef.current = null;
-        if (from !== null && to !== null && from !== to) {
-          const next = [...groupsRef.current];
-          const [moved] = next.splice(from, 1);
-          next.splice(to, 0, moved);
-          // state リセットと onDragEnd を同一バッチで処理させる
+        if (from === null) { setActiveIdx(null); return; }
+
+        const dest = to ?? from;
+        // ドロップ位置へスプリングで着地
+        Animated.spring(activeTopAnim, { toValue: dest * STEP, ...SPRING_CFG }).start(() => {
+          // 着地後、destinationスロットを正規位置に初期化（再レンダリング時のジャンプ防止）
+          animTops.current[dest]?.setValue(dest * STEP);
           setActiveIdx(null);
-          setOverIdx(null);
-          onDragEndRef.current(next);
-        } else {
-          setActiveIdx(null);
-          setOverIdx(null);
-        }
+          if (to !== null && from !== to) {
+            const next = [...groupsRef.current];
+            const [moved] = next.splice(from, 1);
+            next.splice(to, 0, moved);
+            onDragEndRef.current(next);
+          }
+        });
       },
+
       onPanResponderTerminate: () => {
+        const from = activeRef.current;
         activeRef.current = null;
         overRef.current = null;
-        setActiveIdx(null);
-        setOverIdx(null);
+        if (from === null) { setActiveIdx(null); return; }
+        // キャンセル時は元の位置へスプリングで戻す
+        Animated.spring(activeTopAnim, { toValue: from * STEP, ...SPRING_CFG }).start(() => {
+          animTops.current[from]?.setValue(from * STEP);
+          groupsRef.current.forEach((_, i) => {
+            if (i !== from) Animated.spring(animTops.current[i]!, { toValue: i * STEP, ...SPRING_CFG }).start();
+          });
+          setActiveIdx(null);
+        });
       },
     })
   ).current;
@@ -182,38 +232,31 @@ function QueueList({ groups, onDragEnd, renderItem }: QueueListProps) {
       {...panResponder.panHandlers}
     >
       {groups.map((group, index) => {
-        let vIdx = index;
-        if (activeIdx !== null && overIdx !== null && activeIdx !== overIdx) {
-          if (index === activeIdx) {
-            vIdx = overIdx;
-          } else if (activeIdx < overIdx && index > activeIdx && index <= overIdx) {
-            vIdx = index - 1;
-          } else if (activeIdx > overIdx && index >= overIdx && index < activeIdx) {
-            vIdx = index + 1;
-          }
-        }
+        const isActive = activeIdx === index;
         return (
-          <View
+          <Animated.View
             key={String(group.itemStart)}
-            style={{
-              position: 'absolute',
-              top: vIdx * STEP,
-              left: 0,
-              right: 0,
-              opacity: activeIdx !== null && index === activeIdx ? 0.6 : 1,
-            }}
+            style={[
+              {
+                position: 'absolute',
+                top: isActive ? activeTopAnim : (animTops.current[index] ?? new Animated.Value(index * STEP)),
+                left: 0,
+                right: 0,
+              },
+              isActive ? styles.queueItemLifted : undefined,
+            ]}
           >
             {renderItem(
               group,
               () => {
+                activeTopAnim.setValue(index * STEP);
                 activeRef.current = index;
                 overRef.current = index;
                 setActiveIdx(index);
-                setOverIdx(index);
               },
-              activeIdx === index,
+              isActive,
             )}
-          </View>
+          </Animated.View>
         );
       })}
     </View>
@@ -283,6 +326,9 @@ export default function TimerScreen() {
       void silentAudio.stop();
     }
     if (!suppressVoiceRef.current) {
+      if (action.type === 'skip' || action.type === 'previous') {
+        voiceService.stop();
+      }
       announceForTransition(previous, next, r, voiceService);
     }
     rawDispatch(action);
@@ -718,7 +764,20 @@ export default function TimerScreen() {
                     {group.setCount > 1 ? ` × ${group.setCount}` : ''}
                   </Text>
                   {group.status === 'current' && currentIsWorkout && (
-                    <Pressable onPress={handleDefer} style={styles.deferBtn} hitSlop={8}>
+                    <Pressable
+                      onPress={() =>
+                        Alert.alert(
+                          '後回しにしますか？',
+                          'この種目をキューの末尾に移動します。',
+                          [
+                            { text: 'キャンセル', style: 'cancel' },
+                            { text: '後回し', style: 'destructive', onPress: handleDefer },
+                          ],
+                        )
+                      }
+                      style={styles.deferBtn}
+                      hitSlop={8}
+                    >
                       <Text style={styles.deferBtnText}>後回し</Text>
                     </Pressable>
                   )}
@@ -729,31 +788,43 @@ export default function TimerScreen() {
               )}
             />
           ) : (
-            <View>
-              {ar.items.map((item, index) => (
-                <View
-                  key={item.id}
-                  style={[
-                    styles.queueItem,
-                    { height: QUEUE_ITEM_H },
-                    index === state.currentIndex && styles.queueItemCurrent,
-                    index < state.currentIndex && styles.queueItemDone,
-                    index < ar.items.length - 1 && { marginBottom: QUEUE_GAP },
-                  ]}
-                >
-                  <Text
+            <ScrollView style={styles.allViewScroll} showsVerticalScrollIndicator={false}>
+              {ar.items.map((item, index) => {
+                const isDone = index < state.currentIndex;
+                const isCurrent = index === state.currentIndex;
+                if (item.type === 'interval') {
+                  return (
+                    <View key={item.id} style={[styles.allViewRest, isDone && { opacity: 0.3 }]}>
+                      <View style={styles.allViewRestLine} />
+                      <Text style={styles.allViewRestText}>休憩</Text>
+                      <Text style={styles.allViewRestDuration}>{formatTime(item.durationSec)}</Text>
+                      <View style={styles.allViewRestLine} />
+                    </View>
+                  );
+                }
+                return (
+                  <View
+                    key={item.id}
                     style={[
-                      styles.queueItemTitle,
-                      item.type === 'interval' && styles.queueItemTitleInterval,
-                      index < state.currentIndex && styles.queueItemTitleDone,
+                      styles.queueItem,
+                      { height: QUEUE_ITEM_H, marginBottom: 2 },
+                      isCurrent && styles.queueItemCurrent,
+                      isDone && styles.queueItemDone,
                     ]}
-                    numberOfLines={1}
                   >
-                    {item.title}
-                  </Text>
-                </View>
-              ))}
-            </View>
+                    <Text
+                      style={[styles.queueItemTitle, isDone && styles.queueItemTitleDone]}
+                      numberOfLines={1}
+                    >
+                      {item.title}
+                    </Text>
+                    <Text style={[styles.allViewDuration, isDone && styles.queueItemTitleDone]}>
+                      {formatTime(item.durationSec)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
           )}
         </View>
 
@@ -980,6 +1051,36 @@ const styles = StyleSheet.create({
   toggleBtnText: { color: Colors.textMuted, fontSize: 11, fontWeight: '700' },
   toggleBtnTextActive: { color: Colors.orange },
   queueItemTitleInterval: { color: Colors.textSub },
+  // 全表示モード
+  allViewScroll: { maxHeight: 220 },
+  allViewRest: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 4,
+    height: 28,
+    marginBottom: 2,
+  },
+  allViewRestLine: { flex: 1, height: 1, backgroundColor: '#3C3C42' },
+  allViewRestText: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  allViewRestDuration: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  allViewDuration: {
+    color: Colors.textSub,
+    fontSize: 12,
+    fontWeight: '600',
+    flexShrink: 0,
+    paddingLeft: 8,
+  },
   queueItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -996,6 +1097,15 @@ const styles = StyleSheet.create({
   queueItemTitle: { flex: 1, color: Colors.text, fontSize: 13, fontWeight: '700' },
   queueItemTitleDone: { color: Colors.textMuted },
   queueItemDragging: { backgroundColor: '#FF6B3525', borderColor: Colors.orange },
+  queueItemLifted: {
+    opacity: 0.85,
+    zIndex: 10,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+  },
   dragHandle: { color: Colors.textMuted, fontSize: 18, paddingLeft: 8 },
   deferBtn: {
     borderWidth: 1,

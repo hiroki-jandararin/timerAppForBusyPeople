@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Alert } from 'react-native';
 import TimerScreen from '../app/(app)/routines/[id]/timer';
 
 jest.mock('expo-router', () => ({
@@ -111,7 +112,27 @@ describe('TimerScreen — C4 キュードラッグ', () => {
     expect(screen.getByText('後回し')).toBeTruthy();
   });
 
-  it('「後回し」を押すと現在グループが末尾に移動し次のグループが current になる', async () => {
+  it('「後回し」を押すと確認ダイアログが表示される', async () => {
+    const spy = jest.spyOn(Alert, 'alert');
+    await startTimer();
+    fireEvent.press(screen.getByText('後回し'));
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('後回し'),
+      expect.any(String),
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'キャンセル' }),
+        expect.objectContaining({ text: '後回し' }),
+      ]),
+    );
+    spy.mockRestore();
+  });
+
+  it('確認ダイアログで「後回し」を押すと現在グループが末尾に移動し次のグループが current になる', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementationOnce((_title, _msg, buttons) => {
+      const btn = (buttons as { text: string; onPress?: () => void }[])
+        ?.find((b) => b.text === '後回し');
+      btn?.onPress?.();
+    });
     await startTimer();
     fireEvent.press(screen.getByText('後回し'));
     // スクワット（最初の種目）が末尾に回り、プッシュアップが current になる

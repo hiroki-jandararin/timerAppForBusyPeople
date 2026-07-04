@@ -5,4 +5,8 @@ export class ExpoSpeechVoiceService implements VoiceService {
   speak(text: string): void {
     Speech.speak(text, { language: 'ja-JP' });
   }
+
+  stop(): void {
+    Speech.stop();
+  }
 }
