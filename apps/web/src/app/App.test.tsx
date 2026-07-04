@@ -89,13 +89,14 @@ class MemoryRoutineRepository implements RoutineRepository {
     return this.routines.find((routine) => routine.id === id) ?? null;
   }
 
-  async save(routine: Routine) {
+  async create(routine: Routine) {
+    this.routines.push(routine);
+    return routine;
+  }
+
+  async update(routine: Routine) {
     const index = this.routines.findIndex((item) => item.id === routine.id);
-    if (index >= 0) {
-      this.routines[index] = routine;
-    } else {
-      this.routines.push(routine);
-    }
+    if (index >= 0) this.routines[index] = routine;
   }
 
   async delete(id: string) {

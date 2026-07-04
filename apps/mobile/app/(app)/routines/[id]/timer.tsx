@@ -1,6 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/colors';
-import { routineApiClient, workoutHistoryApiClient } from '@timeapp/api-client';
+import { routineApiClient, workoutHistoryApiClient, ApiError } from '@timeapp/api-client';
 import type { Routine } from '@timeapp/core';
 import {
   announceForTransition,
@@ -17,12 +17,18 @@ import {
 } from '@timeapp/core';
 import { ExpoSpeechVoiceService } from '@/features/voice/expoSpeechVoiceService';
 import { ExpoKeepAwakeService } from '@/features/wakeLock/expoKeepAwakeService';
+import { SilentAudioService } from '@/features/backgroundTimer/silentAudioService';
+import { reorderUpcoming } from '@/features/timer/reorderUpcoming';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  AppState,
   Animated,
+  PanResponder,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -31,6 +37,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient, Polygon, Rect, Stop } from 'react-native-svg';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
+
+const QUEUE_ITEM_H = 40; // paddingVertical:8*2 + text高さ
+const QUEUE_GAP = 4;
 
 const RING_RADIUS = 45;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
@@ -94,8 +103,170 @@ function NextIcon() {
   );
 }
 
+// ─── QueueList ────────────────────────────────────────────────────────────────
+// Animated.Valueで各スロットのtopを管理し、ドラッグをスムーズにアニメーションする。
+
+const SPRING_CFG = { tension: 300, friction: 30, useNativeDriver: false } as const;
+
+type QueueListProps = {
+  groups: ExerciseGroup[];
+  onDragEnd: (newGroups: ExerciseGroup[]) => void;
+  renderItem: (group: ExerciseGroup, drag: () => void, isActive: boolean) => React.ReactNode;
+};
+
+function QueueList({ groups, onDragEnd, renderItem }: QueueListProps) {
+  const STEP = QUEUE_ITEM_H + QUEUE_GAP;
+
+  // スロットごとのtop位置アニメーション（インデックス順に管理）
+  const animTops = useRef<Animated.Value[]>([]);
+  while (animTops.current.length < groups.length) {
+    animTops.current.push(new Animated.Value(animTops.current.length * STEP));
+  }
+
+  // ドラッグ中のアイテム専用アニメーション（指に直追従）
+  const activeTopAnim = useRef(new Animated.Value(0)).current;
+
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const activeRef = useRef<number | null>(null);
+  const overRef = useRef<number | null>(null);
+  const groupsRef = useRef(groups);
+  const onDragEndRef = useRef(onDragEnd);
+  const containerRef = useRef<View>(null);
+  const containerTopRef = useRef(0);
+  groupsRef.current = groups;
+  onDragEndRef.current = onDragEnd;
+
+  // グループ変更後（並び替え完了後）に全スロットを正規位置にリセット
+  useEffect(() => {
+    if (activeRef.current !== null) return;
+    groups.forEach((_, i) => animTops.current[i]?.setValue(i * STEP));
+  }, [groups]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: () => activeRef.current !== null,
+      onPanResponderMove: (_, gs) => {
+        const aIdx = activeRef.current;
+        if (aIdx === null) return;
+
+        // ドラッグアイテムを指に追従させる
+        activeTopAnim.setValue(aIdx * STEP + gs.dy);
+
+        // ホバー先スロットを計算
+        const all = groupsRef.current;
+        const firstUp = all.findIndex((g) => g.status === 'upcoming');
+        const relY = gs.moveY - containerTopRef.current;
+        const clamped = Math.max(
+          firstUp >= 0 ? firstUp : 0,
+          Math.min(all.length - 1, Math.floor(relY / STEP))
+        );
+        if (clamped === overRef.current) return;
+        overRef.current = clamped;
+
+        // 他アイテムをスプリングでスライド
+        all.forEach((_, i) => {
+          if (i === aIdx) return;
+          const anim = animTops.current[i];
+          if (!anim) return;
+          let target: number;
+          if (aIdx < clamped) {
+            target = i > aIdx && i <= clamped ? (i - 1) * STEP : i * STEP;
+          } else {
+            target = i >= clamped && i < aIdx ? (i + 1) * STEP : i * STEP;
+          }
+          Animated.spring(anim, { toValue: target, ...SPRING_CFG }).start();
+        });
+      },
+
+      onPanResponderRelease: () => {
+        const from = activeRef.current;
+        const to = overRef.current;
+        activeRef.current = null;
+        overRef.current = null;
+        if (from === null) { setActiveIdx(null); return; }
+
+        const dest = to ?? from;
+        // ドロップ位置へスプリングで着地
+        Animated.spring(activeTopAnim, { toValue: dest * STEP, ...SPRING_CFG }).start(() => {
+          // 着地後、destinationスロットを正規位置に初期化（再レンダリング時のジャンプ防止）
+          animTops.current[dest]?.setValue(dest * STEP);
+          setActiveIdx(null);
+          if (to !== null && from !== to) {
+            const next = [...groupsRef.current];
+            const [moved] = next.splice(from, 1);
+            next.splice(to, 0, moved);
+            onDragEndRef.current(next);
+          }
+        });
+      },
+
+      onPanResponderTerminate: () => {
+        const from = activeRef.current;
+        activeRef.current = null;
+        overRef.current = null;
+        if (from === null) { setActiveIdx(null); return; }
+        // キャンセル時は元の位置へスプリングで戻す
+        Animated.spring(activeTopAnim, { toValue: from * STEP, ...SPRING_CFG }).start(() => {
+          animTops.current[from]?.setValue(from * STEP);
+          groupsRef.current.forEach((_, i) => {
+            if (i !== from) Animated.spring(animTops.current[i]!, { toValue: i * STEP, ...SPRING_CFG }).start();
+          });
+          setActiveIdx(null);
+        });
+      },
+    })
+  ).current;
+
+  const totalH = groups.length * QUEUE_ITEM_H + Math.max(0, groups.length - 1) * QUEUE_GAP;
+
+  return (
+    <View
+      ref={containerRef}
+      style={{ height: totalH }}
+      onLayout={() => {
+        containerRef.current?.measure((_x, _y, _w, _h, _px, pageY) => {
+          containerTopRef.current = pageY;
+        });
+      }}
+      {...panResponder.panHandlers}
+    >
+      {groups.map((group, index) => {
+        const isActive = activeIdx === index;
+        return (
+          <Animated.View
+            key={String(group.itemStart)}
+            style={[
+              {
+                position: 'absolute',
+                top: isActive ? activeTopAnim : (animTops.current[index] ?? new Animated.Value(index * STEP)),
+                left: 0,
+                right: 0,
+              },
+              isActive ? styles.queueItemLifted : undefined,
+            ]}
+          >
+            {renderItem(
+              group,
+              () => {
+                activeTopAnim.setValue(index * STEP);
+                activeRef.current = index;
+                overRef.current = index;
+                setActiveIdx(index);
+              },
+              isActive,
+            )}
+          </Animated.View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function TimerScreen() {
-  const { token } = useAuth();
+  const { token, signOut } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -107,6 +278,7 @@ export default function TimerScreen() {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
   const [hasShownAdjustment, setHasShownAdjustment] = useState(false);
+  const [queueView, setQueueView] = useState<'set' | 'all'>('set');
   const plannedStartAtMs = useRef<number | null>(null);
   const startedAtMsRef = useRef<number | null>(null);
   const wasManualFinishRef = useRef(false);
@@ -114,6 +286,9 @@ export default function TimerScreen() {
   const stateRef = useRef(state);
   const voiceService = useRef(new ExpoSpeechVoiceService()).current;
   const wakeLockService = useRef(new ExpoKeepAwakeService()).current;
+  const silentAudio = useRef(new SilentAudioService()).current;
+  const suppressVoiceRef = useRef(false);
+  const lastTickAtRef = useRef<number | null>(null);
 
   const api = routineApiClient({ baseUrl: API_BASE_URL, getToken: () => token });
   const historyApi = workoutHistoryApiClient({ baseUrl: API_BASE_URL, getToken: () => token });
@@ -130,9 +305,11 @@ export default function TimerScreen() {
       const start = Date.now() + 3 * 1000;
       plannedStartAtMs.current = start;
       startedAtMsRef.current = start;
-      setPlannedEndAtMs(start + calculateTotalDuration(r) * 1000);
+      const endMs = start + calculateTotalDuration(r) * 1000;
+      setPlannedEndAtMs(endMs);
       setHasShownAdjustment(false);
       setIsAdjustmentOpen(false);
+      void silentAudio.start();
     }
     if (action.type === 'finish') {
       wasManualFinishRef.current = true;
@@ -146,8 +323,14 @@ export default function TimerScreen() {
       setPlannedEndAtMs(null);
       setIsAdjustmentOpen(false);
       setHasShownAdjustment(false);
+      void silentAudio.stop();
     }
-    announceForTransition(previous, next, r, voiceService);
+    if (!suppressVoiceRef.current) {
+      if (action.type === 'skip' || action.type === 'previous') {
+        voiceService.stop();
+      }
+      announceForTransition(previous, next, r, voiceService);
+    }
     rawDispatch(action);
   }
 
@@ -160,6 +343,25 @@ export default function TimerScreen() {
     setActiveRoutine(moveGroup(r, cur.currentIndex, end, r.items.length, true));
   }
 
+  function handleQueueReorder(newGroups: ExerciseGroup[]) {
+    const r = activeRoutine;
+    if (!r) return;
+    const cur = stateRef.current;
+    const currentGroup = newGroups.find((g) => g.status === 'current');
+    // currentGroupがない（インターバル中など）はgetExerciseGroupRangeで算出し、
+    // trailing intervalも含めるよう+1する
+    let currentGroupEnd: number;
+    if (currentGroup) {
+      currentGroupEnd = currentGroup.itemEnd;
+    } else {
+      const { end } = getExerciseGroupRange(r.items, cur.currentIndex);
+      currentGroupEnd =
+        end + 1 < r.items.length && r.items[end + 1]?.type === 'interval' ? end + 1 : end;
+    }
+    const upcomingGroups = newGroups.filter((g) => g.status === 'upcoming');
+    setActiveRoutine(reorderUpcoming(r, currentGroupEnd, upcomingGroups));
+  }
+
   function applyRestShortening() {
     if (!activeRoutine || !plannedEndAtMs) return;
     const projectedEnd =
@@ -170,15 +372,6 @@ export default function TimerScreen() {
     const plan = createRestShorteningPlan(activeRoutine, state.currentIndex, Math.max(0, deltaSec));
     if (plan.recoveredSec > 0) setActiveRoutine(plan.routine);
     setIsAdjustmentOpen(false);
-  }
-
-  function handleDoNext(groupStart: number) {
-    const r = activeRoutine;
-    if (!r) return;
-    const cur = stateRef.current;
-    const { end: currentEnd } = getExerciseGroupRange(r.items, cur.currentIndex);
-    const { end: targetEnd } = getExerciseGroupRange(r.items, groupStart);
-    setActiveRoutine(moveGroup(r, groupStart, targetEnd, currentEnd + 1, false));
   }
 
   useEffect(() => {
@@ -222,17 +415,40 @@ export default function TimerScreen() {
     api.getById(id).then((r) => {
       setRoutine(r);
       setActiveRoutine(r);
+    }).catch((e) => {
+      if (e instanceof ApiError && e.status === 401) signOut();
+      else router.back();
     });
   }, [id]);
 
   useEffect(() => {
     if (state.status !== 'running' && state.status !== 'countdown') return;
     const interval = setInterval(() => {
+      lastTickAtRef.current = Date.now();
       const r = activeRoutine ?? routine;
       if (r) dispatch({ type: 'tick', routine: r });
     }, 1000);
     return () => clearInterval(interval);
   }, [state.status, activeRoutine, routine]);
+
+  // 前台復帰時にバックグラウンド中の経過分を補完
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState !== 'active') return;
+      if (stateRef.current.status !== 'running') return;
+      if (!lastTickAtRef.current) return;
+      const elapsed = Math.floor((Date.now() - lastTickAtRef.current) / 1000);
+      if (elapsed < 2) return;
+      const r = activeRoutine ?? routine;
+      if (!r) return;
+      suppressVoiceRef.current = true;
+      for (let i = 0; i < elapsed - 1; i++) {
+        dispatch({ type: 'tick', routine: r });
+      }
+      suppressVoiceRef.current = false;
+    });
+    return () => sub.remove();
+  }, [activeRoutine, routine]);
 
   useEffect(() => {
     if (!routine || state.status !== 'running') return;
@@ -503,38 +719,113 @@ export default function TimerScreen() {
 
         {/* QUEUE */}
         <View style={styles.queue}>
-          <Text style={styles.queueLabel}>QUEUE</Text>
-          {groups.map((group: ExerciseGroup) => (
-            <View
-              key={group.itemStart}
-              testID={`queue-item-${group.itemStart}`}
-              style={[
-                styles.queueItem,
-                group.status === 'current' && styles.queueItemCurrent,
-                group.status === 'done' && styles.queueItemDone,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.queueItemTitle,
-                  group.status === 'done' && styles.queueItemTitleDone,
-                ]}
+          <View style={styles.queueHeader}>
+            <Text style={styles.queueLabel}>QUEUE</Text>
+            <View style={styles.queueToggle}>
+              <Pressable
+                onPress={() => setQueueView('set')}
+                style={[styles.toggleBtn, queueView === 'set' && styles.toggleBtnActive]}
               >
-                {group.baseTitle}
-                {group.setCount > 1 ? ` × ${group.setCount}` : ''}
-              </Text>
-              {group.status === 'current' && currentIsWorkout && (
-                <Pressable onPress={handleDefer} style={styles.queueBtn}>
-                  <Text style={styles.queueBtnText}>後回し</Text>
-                </Pressable>
-              )}
-              {group.status === 'upcoming' && (
-                <Pressable onPress={() => handleDoNext(group.itemStart)} style={styles.queueBtn}>
-                  <Text style={styles.queueBtnText}>次にやる</Text>
-                </Pressable>
-              )}
+                <Text style={[styles.toggleBtnText, queueView === 'set' && styles.toggleBtnTextActive]}>セット</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setQueueView('all')}
+                style={[styles.toggleBtn, queueView === 'all' && styles.toggleBtnActive]}
+              >
+                <Text style={[styles.toggleBtnText, queueView === 'all' && styles.toggleBtnTextActive]}>全表示</Text>
+              </Pressable>
             </View>
-          ))}
+          </View>
+          {queueView === 'set' ? (
+            <QueueList
+              groups={groups}
+              onDragEnd={handleQueueReorder}
+              renderItem={(group, drag, isActive) => (
+                <Pressable
+                  testID={`queue-item-${group.itemStart}`}
+                  onLongPress={group.status === 'upcoming' ? drag : undefined}
+                  delayLongPress={150}
+                  style={[
+                    styles.queueItem,
+                    { height: QUEUE_ITEM_H },
+                    group.status === 'current' && styles.queueItemCurrent,
+                    group.status === 'done' && styles.queueItemDone,
+                    isActive && styles.queueItemDragging,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.queueItemTitle,
+                      group.status === 'done' && styles.queueItemTitleDone,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {group.baseTitle}
+                    {group.setCount > 1 ? ` × ${group.setCount}` : ''}
+                  </Text>
+                  {group.status === 'current' && currentIsWorkout && (
+                    <Pressable
+                      onPress={() =>
+                        Alert.alert(
+                          '後回しにしますか？',
+                          'この種目をキューの末尾に移動します。',
+                          [
+                            { text: 'キャンセル', style: 'cancel' },
+                            { text: '後回し', style: 'destructive', onPress: handleDefer },
+                          ],
+                        )
+                      }
+                      style={styles.deferBtn}
+                      hitSlop={8}
+                    >
+                      <Text style={styles.deferBtnText}>後回し</Text>
+                    </Pressable>
+                  )}
+                  {group.status === 'upcoming' && (
+                    <Text style={styles.dragHandle}>⠿</Text>
+                  )}
+                </Pressable>
+              )}
+            />
+          ) : (
+            <ScrollView style={styles.allViewScroll} showsVerticalScrollIndicator={false}>
+              {ar.items.map((item, index) => {
+                const isDone = index < state.currentIndex;
+                const isCurrent = index === state.currentIndex;
+                if (item.type === 'interval') {
+                  return (
+                    <View key={item.id} style={[styles.allViewRest, isDone && { opacity: 0.3 }]}>
+                      <View style={styles.allViewRestLine} />
+                      <Text style={styles.allViewRestText}>休憩</Text>
+                      <Text style={styles.allViewRestDuration}>{formatTime(item.durationSec)}</Text>
+                      <View style={styles.allViewRestLine} />
+                    </View>
+                  );
+                }
+                return (
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.queueItem,
+                      { height: QUEUE_ITEM_H, marginBottom: 2 },
+                      isCurrent && styles.queueItemCurrent,
+                      isDone && styles.queueItemDone,
+                    ]}
+                  >
+                    <Text
+                      style={[styles.queueItemTitle, isDone && styles.queueItemTitleDone]}
+                      numberOfLines={1}
+                    >
+                      {item.title}
+                    </Text>
+                    <Text style={[styles.allViewDuration, isDone && styles.queueItemTitleDone]}>
+                      {formatTime(item.durationSec)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
         </View>
 
         <Pressable
@@ -736,12 +1027,59 @@ const styles = StyleSheet.create({
   adjustmentBtnSecondaryText: { color: Colors.textMuted, fontSize: 13 },
   // queue
   queue: { gap: 4 },
+  queueHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   queueLabel: {
     color: Colors.textMuted,
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 2,
-    marginBottom: 4,
+  },
+  queueToggle: { flexDirection: 'row', gap: 4 },
+  toggleBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#3C3C42',
+  },
+  toggleBtnActive: { backgroundColor: '#FF6B3520', borderColor: '#FF6B3560' },
+  toggleBtnText: { color: Colors.textMuted, fontSize: 11, fontWeight: '700' },
+  toggleBtnTextActive: { color: Colors.orange },
+  queueItemTitleInterval: { color: Colors.textSub },
+  // 全表示モード
+  allViewScroll: { maxHeight: 220 },
+  allViewRest: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 4,
+    height: 28,
+    marginBottom: 2,
+  },
+  allViewRestLine: { flex: 1, height: 1, backgroundColor: '#3C3C42' },
+  allViewRestText: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  allViewRestDuration: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  allViewDuration: {
+    color: Colors.textSub,
+    fontSize: 12,
+    fontWeight: '600',
+    flexShrink: 0,
+    paddingLeft: 8,
   },
   queueItem: {
     flexDirection: 'row',
@@ -758,12 +1096,24 @@ const styles = StyleSheet.create({
   queueItemDone: { opacity: 0.4 },
   queueItemTitle: { flex: 1, color: Colors.text, fontSize: 13, fontWeight: '700' },
   queueItemTitleDone: { color: Colors.textMuted },
-  queueBtn: {
-    backgroundColor: Colors.orange,
+  queueItemDragging: { backgroundColor: '#FF6B3525', borderColor: Colors.orange },
+  queueItemLifted: {
+    opacity: 0.85,
+    zIndex: 10,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+  },
+  dragHandle: { color: Colors.textMuted, fontSize: 18, paddingLeft: 8 },
+  deferBtn: {
+    borderWidth: 1,
+    borderColor: Colors.border,
     borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 3,
     marginLeft: 8,
   },
-  queueBtnText: { color: Colors.bg, fontSize: 11, fontWeight: '800' },
+  deferBtnText: { color: Colors.textSub, fontSize: 11, fontWeight: '700' },
 });

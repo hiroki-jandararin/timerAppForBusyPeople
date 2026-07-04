@@ -26,13 +26,23 @@ export class GoRoutineRepository implements RoutineRepository {
     return res.json();
   }
 
-  async save(routine: Routine): Promise<void> {
+  async create(routine: Routine): Promise<Routine> {
+    const res = await fetch(`${BASE_URL}/routines`, {
+      method: 'POST',
+      headers: await this.headers(),
+      body: JSON.stringify(routine),
+    });
+    if (!res.ok) throw new Error(`Failed to create routine: ${res.status}`);
+    return res.json();
+  }
+
+  async update(routine: Routine): Promise<void> {
     const res = await fetch(`${BASE_URL}/routines/${routine.id}`, {
       method: 'PUT',
       headers: await this.headers(),
       body: JSON.stringify(routine),
     });
-    if (!res.ok) throw new Error(`Failed to save routine: ${res.status}`);
+    if (!res.ok) throw new Error(`Failed to update routine: ${res.status}`);
   }
 
   async delete(id: string): Promise<void> {

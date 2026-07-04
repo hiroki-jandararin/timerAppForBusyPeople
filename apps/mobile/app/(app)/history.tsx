@@ -1,6 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/colors';
-import { workoutHistoryApiClient } from '@timeapp/api-client';
+import CalendarHeatmap from '@/components/CalendarHeatmap';
+import { workoutHistoryApiClient, ApiError } from '@timeapp/api-client';
 import type { WorkoutHistory } from '@timeapp/core';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -102,7 +103,7 @@ function HistoryCard({ history }: { history: WorkoutHistory }) {
 }
 
 export default function HistoryScreen() {
-  const { token } = useAuth();
+  const { token, signOut } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [histories, setHistories] = useState<WorkoutHistory[] | null>(null);
@@ -110,7 +111,9 @@ export default function HistoryScreen() {
   const api = workoutHistoryApiClient({ baseUrl: API_BASE_URL, getToken: () => token });
 
   useEffect(() => {
-    api.getAll().then(setHistories);
+    api.getAll().then(setHistories).catch((e) => {
+      if (e instanceof ApiError && e.status === 401) signOut();
+    });
   }, []);
 
   if (histories === null) {
@@ -157,6 +160,11 @@ export default function HistoryScreen() {
               <Text style={styles.statLabel}>今月の回数</Text>
             </View>
           </View>
+
+          {/* カレンダーヒートマップ */}
+          <CalendarHeatmap
+            markedDates={histories.map((h) => h.startedAt.slice(0, 10))}
+          />
 
           {histories.length === 0 && (
             <View style={styles.emptyState}>

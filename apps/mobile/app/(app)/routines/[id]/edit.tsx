@@ -1,6 +1,6 @@
 import RoutineForm from '@/components/RoutineForm';
 import { useAuth } from '@/contexts/AuthContext';
-import { routineApiClient, type CreateRoutineInput } from '@timeapp/api-client';
+import { routineApiClient, ApiError, type CreateRoutineInput } from '@timeapp/api-client';
 import type { Routine } from '@timeapp/core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -10,7 +10,7 @@ import { Colors } from '@/constants/colors';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
 
 export default function EditRoutineScreen() {
-  const { token } = useAuth();
+  const { token, signOut } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [routine, setRoutine] = useState<Routine | null>(null);
@@ -18,7 +18,10 @@ export default function EditRoutineScreen() {
   const api = routineApiClient({ baseUrl: API_BASE_URL, getToken: () => token });
 
   useEffect(() => {
-    api.getById(id).then(setRoutine);
+    api.getById(id).then(setRoutine).catch((e) => {
+      if (e instanceof ApiError && e.status === 401) signOut();
+      else router.back();
+    });
   }, [id]);
 
   if (!routine) {

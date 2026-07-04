@@ -130,7 +130,12 @@ function RoutineApp({
   }
 
   async function saveRoutine(routine: Routine) {
-    await repository.save(routine);
+    const isNew = !routines.some((r) => r.id === routine.id);
+    if (isNew) {
+      await repository.create(routine);
+    } else {
+      await repository.update(routine);
+    }
     await reload();
   }
 
@@ -143,7 +148,7 @@ function RoutineApp({
   }
 
   async function copyRoutine(routine: Routine) {
-    await repository.save(duplicateRoutine(routine));
+    await repository.create(duplicateRoutine(routine));
     await reload();
   }
 

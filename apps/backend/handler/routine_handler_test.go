@@ -15,9 +15,10 @@ import (
 
 // モック: FindAll が固定データを返す
 type mockRoutineRepository struct {
-	routines       []domain.Routine
-	routine        *domain.Routine
-	capturedUserID string
+	routines        []domain.Routine
+	routine         *domain.Routine
+	capturedUserID  string
+	capturedRoutine *domain.Routine
 }
 
 func (m *mockRoutineRepository) FindAll(userID string) ([]domain.Routine, error) {
@@ -30,6 +31,7 @@ func (m *mockRoutineRepository) FindByID(id string) (*domain.Routine, error) {
 }
 
 func (m *mockRoutineRepository) Create(userID string, routine *domain.Routine) (*domain.Routine, error) {
+	m.capturedRoutine = routine
 	return m.routine, nil
 }
 
@@ -175,4 +177,18 @@ func TestCreateRoutine(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
 	assert.JSONEq(t, `{"id":"1","name":"朝トレ","items":[],"createdAt":"0001-01-01T00:00:00Z","updatedAt":"0001-01-01T00:00:00Z"}`, rr.Body.String())
+}
+
+func TestCreateRoutine_GeneratesUUID(t *testing.T) {
+	body := `{"name":"朝トレ","items":[{"type":"workout","title":"スクワット","durationSec":30}]}`
+	req := httptest.NewRequest("POST", "/routines", strings.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	mock := &mockRoutineRepository{routine: &domain.Routine{ID: "generated", Name: "朝トレ", Items: []domain.RoutineItem{}}}
+	h := handler.NewRoutineHandler(mock)
+	h.CreateRoutine(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.NotEmpty(t, mock.capturedRoutine.ID, "ハンドラがIDを生成して repo に渡すこと")
+	assert.Regexp(t, `^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`, mock.capturedRoutine.ID)
 }

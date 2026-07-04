@@ -16,14 +16,15 @@ const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 async function signInWithEmail(email: string, password: string): Promise<string> {
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error_description ?? 'サインインに失敗しました');
+    console.error('signIn error', res.status, JSON.stringify(body));
+    throw new Error(body.error_description ?? body.msg ?? JSON.stringify(body) ?? 'サインインに失敗しました');
   }
   const data = await res.json();
   return data.access_token as string;
@@ -33,7 +34,7 @@ async function signUpWithEmail(email: string, password: string): Promise<void> {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, options: { redirect_to: 'quickfit://auth/callback' } }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

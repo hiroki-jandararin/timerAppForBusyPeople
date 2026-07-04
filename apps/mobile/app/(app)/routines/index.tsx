@@ -2,6 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/colors';
 import { ApiError, routineApiClient } from '@timeapp/api-client';
 import { duplicateRoutine, type Routine } from '@timeapp/core';
+import { onRoutineChanged } from '@/features/routines/routineEvents';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -141,6 +142,10 @@ export default function RoutinesScreen() {
 
   useEffect(() => {
     load().finally(() => setLoading(false));
+  }, [load]);
+
+  useEffect(() => {
+    return onRoutineChanged(() => load());
   }, [load]);
 
   const onRefresh = async () => {
