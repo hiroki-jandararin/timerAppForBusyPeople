@@ -21,6 +21,10 @@ jest.mock('expo-av', () => ({
     setAudioModeAsync: jest.fn(),
   },
 }));
+jest.mock('react-native-gesture-handler', () => {
+  const { View } = require('react-native');
+  return { Swipeable: View };
+});
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 44, bottom: 0, left: 0, right: 0 }),
 }));
@@ -82,18 +86,36 @@ describe('TimerScreen — C3 QUEUE グループ表示', () => {
   });
 });
 
-describe('TimerScreen — C4 後回し', () => {
+describe('TimerScreen — C4 キュードラッグ', () => {
+  it('キューにすべてのグループが表示される', async () => {
+    await startTimer();
+    expect(screen.getAllByText('スクワット').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('プッシュアップ').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('バーピー').length).toBeGreaterThan(0);
+  });
+
+  it('upcoming グループにドラッグハンドルが表示される', async () => {
+    await startTimer();
+    expect(screen.getAllByText('⠿').length).toBeGreaterThan(0);
+  });
+
+  it('current / done グループにはドラッグハンドルが表示されない', async () => {
+    await startTimer();
+    const queueItems = screen.getAllByText(/スクワット|プッシュアップ|バーピー/);
+    const handles = screen.getAllByText('⠿');
+    expect(handles.length).toBeLessThan(queueItems.length);
+  });
+
   it('現在のワークアウトグループに「後回し」ボタンが表示される', async () => {
     await startTimer();
     expect(screen.getByText('後回し')).toBeTruthy();
   });
 
-  it('「後回し」を押すと現在グループが末尾に移動し、次のグループが current になる', async () => {
+  it('「後回し」を押すと現在グループが末尾に移動し次のグループが current になる', async () => {
     await startTimer();
     fireEvent.press(screen.getByText('後回し'));
-    // プッシュアップが current になるはず
-    const currentIndicators = screen.getAllByText('プッシュアップ');
-    expect(currentIndicators.length).toBeGreaterThan(0);
+    // スクワット（最初の種目）が末尾に回り、プッシュアップが current になる
+    expect(screen.getAllByText('プッシュアップ').length).toBeGreaterThan(0);
   });
 });
 
@@ -146,26 +168,49 @@ describe('TimerScreen — C7 予定終了時刻・遅延表示', () => {
   });
 });
 
-describe('TimerScreen — C5 次にやる', () => {
-  it('upcoming グループに「次にやる」ボタンが表示される', async () => {
+describe('TimerScreen — C5 キュー表示', () => {
+  it('upcoming グループがキューに表示される', async () => {
     await startTimer();
-    expect(screen.getAllByText('次にやる').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('プッシュアップ').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('バーピー').length).toBeGreaterThan(0);
   });
 
-  it('「次にやる」を押すと対象グループが現在の直後に移動する', async () => {
+  it('「次にやる」ボタンは表示されない', async () => {
     await startTimer();
-    // バーピーの「次にやる」を押す（最後の次にやるボタン）
-    const doNextBtns = screen.getAllByText('次にやる');
-    fireEvent.press(doNextBtns[doNextBtns.length - 1]);
-    // バーピーがプッシュアップより前に来るはず
-    const pushElems = screen.getAllByText('プッシュアップ');
-    const burpeeElems = screen.getAllByText('バーピー');
-    expect(pushElems.length).toBeGreaterThan(0);
-    expect(burpeeElems.length).toBeGreaterThan(0);
-    // バーピーの次にやるボタンが消えている(直後に来たので upcoming ではない位置に)
-    // かつプッシュアップの次にやるボタンが存在する
-    const newDoNextBtns = screen.getAllByText('次にやる');
-    expect(newDoNextBtns.length).toBeGreaterThan(0);
+    expect(screen.queryByText('次にやる')).toBeNull();
+  });
+});
+
+describe('TimerScreen — C9 QUEUEビュー切替', () => {
+  it('QUEUEヘッダーに「セット」「全表示」トグルが表示される', async () => {
+    await startTimer();
+    expect(screen.getByText('セット')).toBeTruthy();
+    expect(screen.getByText('全表示')).toBeTruthy();
+  });
+
+  it('デフォルトはセット表示で休憩アイテムが表示されない', async () => {
+    await startTimer();
+    // グループ名は見える
+    expect(screen.getAllByText('プッシュアップ').length).toBeGreaterThan(0);
+    // 休憩（interval）はセットビューでは非表示
+    const restItems = screen.queryAllByText('休憩');
+    expect(restItems.length).toBe(0);
+  });
+
+  it('「全表示」を押すと休憩アイテムも表示される', async () => {
+    await startTimer();
+    fireEvent.press(screen.getByText('全表示'));
+    await act(async () => { jest.advanceTimersByTime(100); });
+    expect(screen.getAllByText('休憩').length).toBeGreaterThan(0);
+  });
+
+  it('「セット」に戻すと休憩アイテムが非表示になる', async () => {
+    await startTimer();
+    fireEvent.press(screen.getByText('全表示'));
+    await act(async () => { jest.advanceTimersByTime(100); });
+    fireEvent.press(screen.getByText('セット'));
+    await act(async () => { jest.advanceTimersByTime(100); });
+    expect(screen.queryAllByText('休憩').length).toBe(0);
   });
 });
 

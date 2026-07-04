@@ -420,6 +420,9 @@ export function buildGroups(
       completedSets = 0;
     }
 
+    const itemEnd =
+      end + 1 < items.length && items[end + 1]?.type === 'interval' ? end + 1 : end;
+
     groups.push({
       baseTitle: buildGroupLabel(roundWorkouts),
       setCount,
@@ -429,10 +432,10 @@ export function buildGroups(
       completedSets,
       status,
       itemStart: start,
-      itemEnd: end,
+      itemEnd,
     });
 
-    i = end + 1;
+    i = itemEnd + 1;
   }
 
   return groups;

@@ -464,6 +464,21 @@ describe('buildGroups', () => {
     expect(groups[1].itemStart).toBe(4);
     expect(groups[1].itemEnd).toBe(4);
   });
+
+  it('workoutにgroupIdがあってintervalにgroupIdがない場合もitemEndがintervalを含む', () => {
+    // workoutにgroupIdがあるがintervalにgroupIdがない混在データ（旧データとの互換）
+    const routine = makeRoutine([
+      { type: 'workout', title: 'スクワット', groupId: 'g1' },
+      { type: 'interval', title: '休憩' },
+      { type: 'workout', title: '腕立て', groupId: 'g2' },
+      { type: 'interval', title: '休憩' },
+    ]);
+    const groups = buildGroups(routine.items, 0, false);
+    expect(groups[0].itemStart).toBe(0);
+    expect(groups[0].itemEnd).toBe(1);
+    expect(groups[1].itemStart).toBe(2);
+    expect(groups[1].itemEnd).toBe(3);
+  });
 });
 
 // ─── assignGroupIds ───────────────────────────────────────────────────────────

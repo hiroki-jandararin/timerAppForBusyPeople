@@ -18,12 +18,14 @@ import {
 import { ExpoSpeechVoiceService } from '@/features/voice/expoSpeechVoiceService';
 import { ExpoKeepAwakeService } from '@/features/wakeLock/expoKeepAwakeService';
 import { SilentAudioService } from '@/features/backgroundTimer/silentAudioService';
+import { reorderUpcoming } from '@/features/timer/reorderUpcoming';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
   Animated,
+  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -33,6 +35,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient, Polygon, Rect, Stop } from 'react-native-svg';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
+
+const QUEUE_ITEM_H = 40; // paddingVertical:8*2 + text高さ
+const QUEUE_GAP = 4;
 
 const RING_RADIUS = 45;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
@@ -96,6 +101,127 @@ function NextIcon() {
   );
 }
 
+// ─── QueueList ────────────────────────────────────────────────────────────────
+// DraggableFlatListの代替。PanResponderで安定したドラッグ並び替えを実現する。
+
+type QueueListProps = {
+  groups: ExerciseGroup[];
+  onDragEnd: (newGroups: ExerciseGroup[]) => void;
+  renderItem: (group: ExerciseGroup, drag: () => void, isActive: boolean) => React.ReactNode;
+};
+
+function QueueList({ groups, onDragEnd, renderItem }: QueueListProps) {
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+  const activeRef = useRef<number | null>(null);
+  const overRef = useRef<number | null>(null);
+  const groupsRef = useRef<ExerciseGroup[]>(groups);
+  const onDragEndRef = useRef<(g: ExerciseGroup[]) => void>(onDragEnd);
+  const containerRef = useRef<View>(null);
+  const containerTopRef = useRef<number>(0);
+  groupsRef.current = groups;
+  onDragEndRef.current = onDragEnd;
+
+  const STEP = QUEUE_ITEM_H + QUEUE_GAP;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => activeRef.current !== null,
+      onMoveShouldSetPanResponder: () => activeRef.current !== null,
+      onPanResponderMove: (_, gs) => {
+        if (activeRef.current === null) return;
+        const all = groupsRef.current;
+        const firstUp = all.findIndex((g) => g.status === 'upcoming');
+        const relY = gs.moveY - containerTopRef.current;
+        const raw = Math.floor(relY / STEP);
+        const clamped = Math.max(firstUp >= 0 ? firstUp : 0, Math.min(all.length - 1, raw));
+        if (clamped !== overRef.current) {
+          overRef.current = clamped;
+          setOverIdx(clamped);
+        }
+      },
+      onPanResponderRelease: () => {
+        const from = activeRef.current;
+        const to = overRef.current;
+        // refを先にリセット: 新グループで activeIdx が残ると位置計算が狂う
+        activeRef.current = null;
+        overRef.current = null;
+        if (from !== null && to !== null && from !== to) {
+          const next = [...groupsRef.current];
+          const [moved] = next.splice(from, 1);
+          next.splice(to, 0, moved);
+          // state リセットと onDragEnd を同一バッチで処理させる
+          setActiveIdx(null);
+          setOverIdx(null);
+          onDragEndRef.current(next);
+        } else {
+          setActiveIdx(null);
+          setOverIdx(null);
+        }
+      },
+      onPanResponderTerminate: () => {
+        activeRef.current = null;
+        overRef.current = null;
+        setActiveIdx(null);
+        setOverIdx(null);
+      },
+    })
+  ).current;
+
+  const totalH = groups.length * QUEUE_ITEM_H + Math.max(0, groups.length - 1) * QUEUE_GAP;
+
+  return (
+    <View
+      ref={containerRef}
+      style={{ height: totalH }}
+      onLayout={() => {
+        containerRef.current?.measure((_x, _y, _w, _h, _px, pageY) => {
+          containerTopRef.current = pageY;
+        });
+      }}
+      {...panResponder.panHandlers}
+    >
+      {groups.map((group, index) => {
+        let vIdx = index;
+        if (activeIdx !== null && overIdx !== null && activeIdx !== overIdx) {
+          if (index === activeIdx) {
+            vIdx = overIdx;
+          } else if (activeIdx < overIdx && index > activeIdx && index <= overIdx) {
+            vIdx = index - 1;
+          } else if (activeIdx > overIdx && index >= overIdx && index < activeIdx) {
+            vIdx = index + 1;
+          }
+        }
+        return (
+          <View
+            key={String(group.itemStart)}
+            style={{
+              position: 'absolute',
+              top: vIdx * STEP,
+              left: 0,
+              right: 0,
+              opacity: activeIdx !== null && index === activeIdx ? 0.6 : 1,
+            }}
+          >
+            {renderItem(
+              group,
+              () => {
+                activeRef.current = index;
+                overRef.current = index;
+                setActiveIdx(index);
+                setOverIdx(index);
+              },
+              activeIdx === index,
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function TimerScreen() {
   const { token, signOut } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -109,6 +235,7 @@ export default function TimerScreen() {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
   const [hasShownAdjustment, setHasShownAdjustment] = useState(false);
+  const [queueView, setQueueView] = useState<'set' | 'all'>('set');
   const plannedStartAtMs = useRef<number | null>(null);
   const startedAtMsRef = useRef<number | null>(null);
   const wasManualFinishRef = useRef(false);
@@ -170,6 +297,25 @@ export default function TimerScreen() {
     setActiveRoutine(moveGroup(r, cur.currentIndex, end, r.items.length, true));
   }
 
+  function handleQueueReorder(newGroups: ExerciseGroup[]) {
+    const r = activeRoutine;
+    if (!r) return;
+    const cur = stateRef.current;
+    const currentGroup = newGroups.find((g) => g.status === 'current');
+    // currentGroupがない（インターバル中など）はgetExerciseGroupRangeで算出し、
+    // trailing intervalも含めるよう+1する
+    let currentGroupEnd: number;
+    if (currentGroup) {
+      currentGroupEnd = currentGroup.itemEnd;
+    } else {
+      const { end } = getExerciseGroupRange(r.items, cur.currentIndex);
+      currentGroupEnd =
+        end + 1 < r.items.length && r.items[end + 1]?.type === 'interval' ? end + 1 : end;
+    }
+    const upcomingGroups = newGroups.filter((g) => g.status === 'upcoming');
+    setActiveRoutine(reorderUpcoming(r, currentGroupEnd, upcomingGroups));
+  }
+
   function applyRestShortening() {
     if (!activeRoutine || !plannedEndAtMs) return;
     const projectedEnd =
@@ -180,15 +326,6 @@ export default function TimerScreen() {
     const plan = createRestShorteningPlan(activeRoutine, state.currentIndex, Math.max(0, deltaSec));
     if (plan.recoveredSec > 0) setActiveRoutine(plan.routine);
     setIsAdjustmentOpen(false);
-  }
-
-  function handleDoNext(groupStart: number) {
-    const r = activeRoutine;
-    if (!r) return;
-    const cur = stateRef.current;
-    const { end: currentEnd } = getExerciseGroupRange(r.items, cur.currentIndex);
-    const { end: targetEnd } = getExerciseGroupRange(r.items, groupStart);
-    setActiveRoutine(moveGroup(r, groupStart, targetEnd, currentEnd + 1, false));
   }
 
   useEffect(() => {
@@ -536,38 +673,88 @@ export default function TimerScreen() {
 
         {/* QUEUE */}
         <View style={styles.queue}>
-          <Text style={styles.queueLabel}>QUEUE</Text>
-          {groups.map((group: ExerciseGroup) => (
-            <View
-              key={group.itemStart}
-              testID={`queue-item-${group.itemStart}`}
-              style={[
-                styles.queueItem,
-                group.status === 'current' && styles.queueItemCurrent,
-                group.status === 'done' && styles.queueItemDone,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.queueItemTitle,
-                  group.status === 'done' && styles.queueItemTitleDone,
-                ]}
+          <View style={styles.queueHeader}>
+            <Text style={styles.queueLabel}>QUEUE</Text>
+            <View style={styles.queueToggle}>
+              <Pressable
+                onPress={() => setQueueView('set')}
+                style={[styles.toggleBtn, queueView === 'set' && styles.toggleBtnActive]}
               >
-                {group.baseTitle}
-                {group.setCount > 1 ? ` × ${group.setCount}` : ''}
-              </Text>
-              {group.status === 'current' && currentIsWorkout && (
-                <Pressable onPress={handleDefer} style={styles.queueBtn}>
-                  <Text style={styles.queueBtnText}>後回し</Text>
-                </Pressable>
-              )}
-              {group.status === 'upcoming' && (
-                <Pressable onPress={() => handleDoNext(group.itemStart)} style={styles.queueBtn}>
-                  <Text style={styles.queueBtnText}>次にやる</Text>
-                </Pressable>
-              )}
+                <Text style={[styles.toggleBtnText, queueView === 'set' && styles.toggleBtnTextActive]}>セット</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setQueueView('all')}
+                style={[styles.toggleBtn, queueView === 'all' && styles.toggleBtnActive]}
+              >
+                <Text style={[styles.toggleBtnText, queueView === 'all' && styles.toggleBtnTextActive]}>全表示</Text>
+              </Pressable>
             </View>
-          ))}
+          </View>
+          {queueView === 'set' ? (
+            <QueueList
+              groups={groups}
+              onDragEnd={handleQueueReorder}
+              renderItem={(group, drag, isActive) => (
+                <Pressable
+                  testID={`queue-item-${group.itemStart}`}
+                  onLongPress={group.status === 'upcoming' ? drag : undefined}
+                  delayLongPress={150}
+                  style={[
+                    styles.queueItem,
+                    { height: QUEUE_ITEM_H },
+                    group.status === 'current' && styles.queueItemCurrent,
+                    group.status === 'done' && styles.queueItemDone,
+                    isActive && styles.queueItemDragging,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.queueItemTitle,
+                      group.status === 'done' && styles.queueItemTitleDone,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {group.baseTitle}
+                    {group.setCount > 1 ? ` × ${group.setCount}` : ''}
+                  </Text>
+                  {group.status === 'current' && currentIsWorkout && (
+                    <Pressable onPress={handleDefer} style={styles.deferBtn} hitSlop={8}>
+                      <Text style={styles.deferBtnText}>後回し</Text>
+                    </Pressable>
+                  )}
+                  {group.status === 'upcoming' && (
+                    <Text style={styles.dragHandle}>⠿</Text>
+                  )}
+                </Pressable>
+              )}
+            />
+          ) : (
+            <View>
+              {ar.items.map((item, index) => (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.queueItem,
+                    { height: QUEUE_ITEM_H },
+                    index === state.currentIndex && styles.queueItemCurrent,
+                    index < state.currentIndex && styles.queueItemDone,
+                    index < ar.items.length - 1 && { marginBottom: QUEUE_GAP },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.queueItemTitle,
+                      item.type === 'interval' && styles.queueItemTitleInterval,
+                      index < state.currentIndex && styles.queueItemTitleDone,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.title}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <Pressable
@@ -769,13 +956,30 @@ const styles = StyleSheet.create({
   adjustmentBtnSecondaryText: { color: Colors.textMuted, fontSize: 13 },
   // queue
   queue: { gap: 4 },
+  queueHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   queueLabel: {
     color: Colors.textMuted,
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 2,
-    marginBottom: 4,
   },
+  queueToggle: { flexDirection: 'row', gap: 4 },
+  toggleBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#3C3C42',
+  },
+  toggleBtnActive: { backgroundColor: '#FF6B3520', borderColor: '#FF6B3560' },
+  toggleBtnText: { color: Colors.textMuted, fontSize: 11, fontWeight: '700' },
+  toggleBtnTextActive: { color: Colors.orange },
+  queueItemTitleInterval: { color: Colors.textSub },
   queueItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -791,12 +995,15 @@ const styles = StyleSheet.create({
   queueItemDone: { opacity: 0.4 },
   queueItemTitle: { flex: 1, color: Colors.text, fontSize: 13, fontWeight: '700' },
   queueItemTitleDone: { color: Colors.textMuted },
-  queueBtn: {
-    backgroundColor: Colors.orange,
+  queueItemDragging: { backgroundColor: '#FF6B3525', borderColor: Colors.orange },
+  dragHandle: { color: Colors.textMuted, fontSize: 18, paddingLeft: 8 },
+  deferBtn: {
+    borderWidth: 1,
+    borderColor: Colors.border,
     borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 3,
     marginLeft: 8,
   },
-  queueBtnText: { color: Colors.bg, fontSize: 11, fontWeight: '800' },
+  deferBtnText: { color: Colors.textSub, fontSize: 11, fontWeight: '700' },
 });
