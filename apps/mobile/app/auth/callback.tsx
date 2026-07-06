@@ -4,8 +4,7 @@ import * as Linking from 'expo-linking';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 
 export default function AuthCallbackScreen() {
   const { signIn } = useAuth();
@@ -26,9 +25,8 @@ export default function AuthCallbackScreen() {
       return;
     }
 
-    // トークンを検証してセッションを確立する
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { Authorization: `Bearer ${accessToken}`, apikey: SUPABASE_ANON_KEY },
+    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     if (!res.ok) {
