@@ -54,8 +54,12 @@ func (c *SupabaseAuthClient) SignIn(email, password string) (string, error) {
 	return result.AccessToken, nil
 }
 
-func (c *SupabaseAuthClient) SignUp(email, password string) error {
-	body, _ := json.Marshal(map[string]string{"email": email, "password": password})
+func (c *SupabaseAuthClient) SignUp(email, password, redirectTo string) error {
+	payload := map[string]any{"email": email, "password": password}
+	if redirectTo != "" {
+		payload["options"] = map[string]string{"email_redirect_to": redirectTo}
+	}
+	body, _ := json.Marshal(payload)
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/auth/v1/signup", c.supabaseURL), bytes.NewReader(body))
 	if err != nil {
 		return err

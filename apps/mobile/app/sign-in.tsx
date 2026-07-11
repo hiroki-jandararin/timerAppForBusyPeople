@@ -1,6 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/colors';
 import { useState } from 'react';
+import * as Linking from 'expo-linking';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -29,10 +30,11 @@ async function signInWithEmail(email: string, password: string): Promise<string>
 }
 
 async function signUpWithEmail(email: string, password: string): Promise<void> {
+  const redirectTo = Linking.createURL('auth/callback');
   const res = await fetch(`${API_BASE_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, redirect_to: redirectTo }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => 'サインアップに失敗しました');
@@ -123,6 +125,10 @@ export default function SignInScreen() {
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
+            {mode === 'signin' ? (
+              <Text style={styles.hint}>※ アカウント作成後はメールの確認が必要です</Text>
+            ) : null}
+
             <Pressable
               style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
               onPress={handleSubmit}
@@ -181,6 +187,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   error: { color: Colors.red, fontSize: 13, textAlign: 'center' },
+  hint: { color: Colors.textMuted, fontSize: 12, textAlign: 'center' },
   button: {
     backgroundColor: Colors.orange,
     borderRadius: 12,

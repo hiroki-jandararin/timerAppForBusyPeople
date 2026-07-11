@@ -1,46 +1,55 @@
-import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
-import * as Linking from 'expo-linking';
-import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Colors } from '@/constants/colors';
 
 export default function AuthCallbackScreen() {
-  const { signIn } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    const url = Linking.getLinkingURL();
-    if (url) handleUrl(url);
-  }, []);
-
-  async function handleUrl(url: string) {
-    const fragment = url.split('#')[1] ?? '';
-    const params = new URLSearchParams(fragment);
-    const accessToken = params.get('access_token');
-
-    if (!accessToken) {
-      router.replace('/sign-in');
-      return;
-    }
-
-    const res = await fetch(`${API_BASE_URL}/auth/me`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!res.ok) {
-      router.replace('/sign-in');
-      return;
-    }
-
-    await signIn(accessToken);
-    router.replace('/(app)/routines');
-  }
-
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <ActivityIndicator size="large" />
+    <View style={styles.container}>
+      <Text style={styles.title}>メール認証が完了しました</Text>
+      <Text style={styles.sub}>
+        サインイン画面でメールアドレスとパスワードを入力してください。
+      </Text>
+      <Pressable
+        style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+        onPress={() => router.replace('/sign-in')}
+      >
+        <Text style={styles.buttonText}>サインイン画面へ</Text>
+      </Pressable>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.bg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    gap: 16,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: Colors.text,
+    textAlign: 'center',
+  },
+  sub: {
+    fontSize: 15,
+    color: Colors.textSub,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  button: {
+    backgroundColor: Colors.orange,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  buttonPressed: { opacity: 0.8 },
+  buttonText: { color: Colors.text, fontSize: 16, fontWeight: '700' },
+});

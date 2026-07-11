@@ -15,7 +15,7 @@ var ErrRateLimitExceeded = errors.New("しばらく時間をおいてから再�
 
 type AuthClient interface {
 	SignIn(email, password string) (string, error)
-	SignUp(email, password string) error
+	SignUp(email, password, redirectTo string) error
 }
 
 type AuthHandler struct {
@@ -58,15 +58,16 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email      string `json:"email"`
+		Password   string `json:"password"`
+		RedirectTo string `json:"redirect_to"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "リクエストの形式が正しくありません", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.client.SignUp(req.Email, req.Password); err != nil {
+	if err := h.client.SignUp(req.Email, req.Password, req.RedirectTo); err != nil {
 		if errors.Is(err, ErrEmailAlreadyExists) {
 			http.Error(w, "このメールアドレスはすでに登録されています", http.StatusConflict)
 			return

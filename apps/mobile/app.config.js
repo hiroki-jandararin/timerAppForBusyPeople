@@ -4,7 +4,7 @@ export default {
   expo: {
     name: IS_PROD ? "QuickFit" : "QuickFit (Dev)",
     slug: "quickfit-timer",
-    scheme: "quickfit",
+    scheme: IS_PROD ? "quickfit" : "quickfit-dev",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",

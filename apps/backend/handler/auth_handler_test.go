@@ -13,15 +13,17 @@ import (
 )
 
 type mockAuthClient struct {
-	token string
-	err   error
+	token          string
+	err            error
+	capturedRedirectTo string
 }
 
 func (m *mockAuthClient) SignIn(email, password string) (string, error) {
 	return m.token, m.err
 }
 
-func (m *mockAuthClient) SignUp(email, password string) error {
+func (m *mockAuthClient) SignUp(email, password, redirectTo string) error {
+	m.capturedRedirectTo = redirectTo
 	return m.err
 }
 
@@ -126,6 +128,20 @@ func TestRegister_RateLimitExceeded_Returns429(t *testing.T) {
 	h.Register(rr, req)
 
 	assert.Equal(t, http.StatusTooManyRequests, rr.Code)
+}
+
+func TestRegister_PassesRedirectTo(t *testing.T) {
+	mock := &mockAuthClient{}
+	h := handler.NewAuthHandler(mock)
+
+	body := `{"email":"new@example.com","password":"password123","redirect_to":"quickfit://auth/callback"}`
+	req := httptest.NewRequest("POST", "/auth/register", strings.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	h.Register(rr, req)
+
+	assert.Equal(t, http.StatusCreated, rr.Code)
+	assert.Equal(t, "quickfit://auth/callback", mock.capturedRedirectTo)
 }
 
 func TestGetMe_ReturnsUserID(t *testing.T) {
