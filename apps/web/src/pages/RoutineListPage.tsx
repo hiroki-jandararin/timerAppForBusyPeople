@@ -11,6 +11,7 @@ type Props = {
   onShowHistory?: () => void;
   currentUserEmail?: string | null;
   onSignOut?: () => void | Promise<void>;
+  onDeleteAccount?: () => Promise<void>;
 };
 
 export function RoutineListPage({
@@ -23,6 +24,7 @@ export function RoutineListPage({
   onShowHistory,
   currentUserEmail,
   onSignOut,
+  onDeleteAccount,
 }: Props) {
   return (
     <main className="mx-auto min-h-screen w-full max-w-lg p-4 sm:p-5">
@@ -35,6 +37,18 @@ export function RoutineListPage({
               <span className="min-w-0 truncate text-[0.65rem] text-[#505058]">
                 {currentUserEmail ?? ''}
               </span>
+              {onDeleteAccount && (
+                <button
+                  className="shrink-0 rounded-lg border border-[#3C1010] px-2.5 py-1 text-[0.65rem] font-bold text-[#7a2020] transition hover:border-[#EF4444] hover:text-[#EF4444] active:scale-[0.97]"
+                  type="button"
+                  onClick={async () => {
+                    if (!confirm('アカウントを削除しますか？\nすべてのデータが失われます。この操作は取り消せません。')) return;
+                    await onDeleteAccount();
+                  }}
+                >
+                  アカウント削除
+                </button>
+              )}
               <button
                 className="shrink-0 rounded-lg border border-[#2C2C30] px-2.5 py-1 text-[0.65rem] font-bold text-[#505058] transition hover:text-[#A0A0A5] active:scale-[0.97]"
                 type="button"

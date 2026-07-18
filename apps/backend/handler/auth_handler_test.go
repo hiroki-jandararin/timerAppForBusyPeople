@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,9 +14,10 @@ import (
 )
 
 type mockAuthClient struct {
-	token          string
-	err            error
+	token              string
+	err                error
 	capturedRedirectTo string
+	deletedUserID      string
 }
 
 func (m *mockAuthClient) SignIn(email, password string) (string, error) {
@@ -24,6 +26,11 @@ func (m *mockAuthClient) SignIn(email, password string) (string, error) {
 
 func (m *mockAuthClient) SignUp(email, password, redirectTo string) error {
 	m.capturedRedirectTo = redirectTo
+	return m.err
+}
+
+func (m *mockAuthClient) DeleteUser(userID string) error {
+	m.deletedUserID = userID
 	return m.err
 }
 
@@ -155,4 +162,31 @@ func TestGetMe_ReturnsUserID(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.JSONEq(t, `{"userId":"user-123"}`, rr.Body.String())
+}
+
+func TestDeleteAccount_Success(t *testing.T) {
+	mock := &mockAuthClient{}
+	h := handler.NewAuthHandler(mock)
+
+	ctx := middleware.WithUserID(context.Background(), "user-123")
+	req := httptest.NewRequest("DELETE", "/users/me", nil).WithContext(ctx)
+	rr := httptest.NewRecorder()
+
+	h.DeleteAccount(rr, req)
+
+	assert.Equal(t, http.StatusNoContent, rr.Code)
+	assert.Equal(t, "user-123", mock.deletedUserID)
+}
+
+func TestDeleteAccount_ServiceError_Returns500(t *testing.T) {
+	mock := &mockAuthClient{err: errors.New("削除失敗")}
+	h := handler.NewAuthHandler(mock)
+
+	ctx := middleware.WithUserID(context.Background(), "user-123")
+	req := httptest.NewRequest("DELETE", "/users/me", nil).WithContext(ctx)
+	rr := httptest.NewRecorder()
+
+	h.DeleteAccount(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }

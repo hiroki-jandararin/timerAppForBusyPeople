@@ -10,16 +10,18 @@ import (
 )
 
 type SupabaseAuthClient struct {
-	supabaseURL string
-	anonKey     string
-	httpClient  *http.Client
+	supabaseURL     string
+	anonKey         string
+	serviceRoleKey  string
+	httpClient      *http.Client
 }
 
-func NewSupabaseAuthClient(supabaseURL, anonKey string) *SupabaseAuthClient {
+func NewSupabaseAuthClient(supabaseURL, anonKey, serviceRoleKey string) *SupabaseAuthClient {
 	return &SupabaseAuthClient{
-		supabaseURL: supabaseURL,
-		anonKey:     anonKey,
-		httpClient:  &http.Client{},
+		supabaseURL:    supabaseURL,
+		anonKey:        anonKey,
+		serviceRoleKey: serviceRoleKey,
+		httpClient:     &http.Client{},
 	}
 }
 
@@ -52,6 +54,29 @@ func (c *SupabaseAuthClient) SignIn(email, password string) (string, error) {
 		return "", err
 	}
 	return result.AccessToken, nil
+}
+
+func (c *SupabaseAuthClient) DeleteUser(userID string) error {
+	url := fmt.Sprintf("%s/auth/v1/admin/users/%s", c.supabaseURL, userID)
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.serviceRoleKey)
+	req.Header.Set("apikey", c.serviceRoleKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		respBody, _ := io.ReadAll(resp.Body)
+		slog.Error("Supabaseユーザー削除エラー", "status", resp.StatusCode, "body", string(respBody))
+		return fmt.Errorf("ユーザー削除エラー: %d", resp.StatusCode)
+	}
+	return nil
 }
 
 func (c *SupabaseAuthClient) SignUp(email, password, redirectTo string) error {

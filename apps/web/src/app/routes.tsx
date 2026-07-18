@@ -25,6 +25,7 @@ type AppRoutesProps = {
   generateAiRoutine: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
   currentUserEmail: string | null;
   onSignOut: () => Promise<void>;
+  onDeleteAccount: () => Promise<void>;
   voiceService: VoiceService;
   wakeLockService: WakeLockService;
 };
@@ -40,6 +41,7 @@ export function AppRoutes({
   generateAiRoutine,
   currentUserEmail,
   onSignOut,
+  onDeleteAccount,
   voiceService,
   wakeLockService,
 }: AppRoutesProps) {
@@ -56,6 +58,7 @@ export function AppRoutes({
               onDuplicate={onDuplicate}
               currentUserEmail={currentUserEmail}
               onSignOut={onSignOut}
+              onDeleteAccount={onDeleteAccount}
             />
           }
         />
@@ -103,6 +106,7 @@ type ListRouteProps = {
   onDuplicate: (routine: Routine) => Promise<void>;
   currentUserEmail: string | null;
   onSignOut: () => Promise<void>;
+  onDeleteAccount: () => Promise<void>;
 };
 
 function ListRoute({
@@ -112,6 +116,7 @@ function ListRoute({
   onDuplicate,
   currentUserEmail,
   onSignOut,
+  onDeleteAccount,
 }: ListRouteProps) {
   const navigate = useNavigate();
 
@@ -129,6 +134,7 @@ function ListRoute({
       onDelete={onDelete}
       currentUserEmail={currentUserEmail}
       onSignOut={onSignOut}
+      onDeleteAccount={onDeleteAccount}
       onShowHistory={() => navigate('/history')}
     />
   );

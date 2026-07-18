@@ -51,6 +51,10 @@ func buildHandler() http.Handler {
 	if supabaseAnonKey == "" {
 		log.Fatal("SUPABASE_ANON_KEY is required")
 	}
+	supabaseServiceRoleKey := os.Getenv("SUPABASE_SERVICE_ROLE_KEY")
+	if supabaseServiceRoleKey == "" {
+		log.Fatal("SUPABASE_SERVICE_ROLE_KEY is required")
+	}
 
 	repo := repository.NewPostgresRoutineRepository(db)
 	h := handler.NewRoutineHandler(repo)
@@ -60,7 +64,7 @@ func buildHandler() http.Handler {
 
 	aiHandler := handler.NewAIHandler()
 
-	authClient := handler.NewSupabaseAuthClient(supabaseURL, supabaseAnonKey)
+	authClient := handler.NewSupabaseAuthClient(supabaseURL, supabaseAnonKey, supabaseServiceRoleKey)
 	authHandler := handler.NewAuthHandler(authClient)
 
 	auth := middleware.AuthMiddleware(supabaseURL)
@@ -69,6 +73,7 @@ func buildHandler() http.Handler {
 	mux.HandleFunc("POST /auth/login", authHandler.Login)
 	mux.HandleFunc("POST /auth/register", authHandler.Register)
 	mux.Handle("GET /auth/me", auth(http.HandlerFunc(authHandler.GetMe)))
+	mux.Handle("DELETE /users/me", auth(http.HandlerFunc(authHandler.DeleteAccount)))
 	mux.Handle("GET /routines", auth(http.HandlerFunc(h.GetRoutines)))
 	mux.Handle("GET /routines/{id}", auth(http.HandlerFunc(h.GetRoutineByID)))
 	mux.Handle("POST /routines", auth(http.HandlerFunc(h.CreateRoutine)))

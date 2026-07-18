@@ -16,6 +16,7 @@ var ErrRateLimitExceeded = errors.New("しばらく時間をおいてから再�
 type AuthClient interface {
 	SignIn(email, password string) (string, error)
 	SignUp(email, password, redirectTo string) error
+	DeleteUser(userID string) error
 }
 
 type AuthHandler struct {
@@ -54,6 +55,15 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.UserIDFromContext(r.Context())
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"userId": userID})
+}
+
+func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.UserIDFromContext(r.Context())
+	if err := h.client.DeleteUser(userID); err != nil {
+		http.Error(w, "サーバーエラーが発生しました", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {

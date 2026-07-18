@@ -26,6 +26,69 @@ describe('RoutineListPage', () => {
     expect(screen.getByRole('button', { name: '＋ 新規' })).toBeInTheDocument();
   });
 
+  it('onDeleteAccountが渡されたときアカウント削除ボタンが表示される', () => {
+    render(
+      <RoutineListPage
+        routines={[]}
+        onCreate={vi.fn()}
+        onEdit={vi.fn()}
+        onStart={vi.fn()}
+        onDuplicate={vi.fn()}
+        onDelete={vi.fn()}
+        onSignOut={vi.fn()}
+        onDeleteAccount={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'アカウント削除' })).toBeInTheDocument();
+  });
+
+  it('アカウント削除ボタンをクリックして確認するとonDeleteAccountが呼ばれる', async () => {
+    const user = userEvent.setup();
+    const onDeleteAccount = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(
+      <RoutineListPage
+        routines={[]}
+        onCreate={vi.fn()}
+        onEdit={vi.fn()}
+        onStart={vi.fn()}
+        onDuplicate={vi.fn()}
+        onDelete={vi.fn()}
+        onSignOut={vi.fn()}
+        onDeleteAccount={onDeleteAccount}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'アカウント削除' }));
+
+    expect(onDeleteAccount).toHaveBeenCalledOnce();
+  });
+
+  it('アカウント削除ボタンをキャンセルするとonDeleteAccountが呼ばれない', async () => {
+    const user = userEvent.setup();
+    const onDeleteAccount = vi.fn();
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    render(
+      <RoutineListPage
+        routines={[]}
+        onCreate={vi.fn()}
+        onEdit={vi.fn()}
+        onStart={vi.fn()}
+        onDuplicate={vi.fn()}
+        onDelete={vi.fn()}
+        onSignOut={vi.fn()}
+        onDeleteAccount={onDeleteAccount}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'アカウント削除' }));
+
+    expect(onDeleteAccount).not.toHaveBeenCalled();
+  });
+
   it('空状態で最初のルーティンを作成できる', async () => {
     const user = userEvent.setup();
     const onCreate = vi.fn();
