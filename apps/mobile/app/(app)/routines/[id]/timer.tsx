@@ -319,7 +319,7 @@ export default function TimerScreen() {
       setPlannedEndAtMs(endMs);
       setHasShownAdjustment(false);
       setIsAdjustmentOpen(false);
-      void silentAudio.start();
+      void silentAudio.start().then(() => void silentAudio.playTick());
     }
     if (action.type === 'finish') {
       wasManualFinishRef.current = true;
@@ -334,6 +334,21 @@ export default function TimerScreen() {
       setIsAdjustmentOpen(false);
       setHasShownAdjustment(false);
       void silentAudio.stop();
+    }
+    if (previous.status === 'countdown' && next.status === 'countdown') {
+      void silentAudio.playTick();
+    }
+    if (previous.status === 'countdown' && next.status === 'running') {
+      void silentAudio.playBeep();
+    }
+    if (
+      next.status === 'running' &&
+      previous.currentIndex !== next.currentIndex
+    ) {
+      void silentAudio.playBeep();
+    }
+    if (previous.status !== 'finished' && next.status === 'finished') {
+      void silentAudio.playBeep();
     }
     if (!suppressVoiceRef.current) {
       if (action.type === 'skip' || action.type === 'previous') {

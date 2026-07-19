@@ -21,6 +21,7 @@ jest.mock('expo-av', () => ({
     Sound: { createAsync: jest.fn().mockResolvedValue({ sound: { playAsync: jest.fn(), stopAsync: jest.fn(), unloadAsync: jest.fn() } }) },
     setAudioModeAsync: jest.fn(),
   },
+  InterruptionModeIOS: { MixWithOthers: 0, DoNotMix: 1, DuckOthers: 2 },
 }));
 jest.mock('react-native-gesture-handler', () => {
   const { View } = require('react-native');

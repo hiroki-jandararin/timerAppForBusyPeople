@@ -11,6 +11,7 @@ jest.mock('expo-av', () => ({
     Sound: { createAsync: (...args: unknown[]) => mockCreateAsync(...args) },
     setAudioModeAsync: (...args: unknown[]) => mockSetAudioModeAsync(...args),
   },
+  InterruptionModeIOS: { MixWithOthers: 0, DoNotMix: 1, DuckOthers: 2 },
 }));
 
 beforeEach(() => {
@@ -59,5 +60,39 @@ describe('SilentAudioService', () => {
   it('start() せずに stop() を呼んでもエラーにならない', async () => {
     const svc = new SilentAudioService();
     await expect(svc.stop()).resolves.not.toThrow();
+  });
+
+  it('start() で mixWithOthers モードを設定し他アプリの音声を止めない', async () => {
+    const svc = new SilentAudioService();
+    await svc.start();
+    expect(mockSetAudioModeAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ interruptionModeIOS: 0 })
+    );
+  });
+
+  it('playBeep() でビープ音を単発再生する', async () => {
+    const svc = new SilentAudioService();
+    await svc.start();
+    await svc.playBeep();
+    expect(mockCreateAsync).toHaveBeenCalledTimes(2);
+    expect(mockCreateAsync).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({ isLooping: false })
+    );
+    expect(mockPlayAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('playTick() でティック音を単発再生する', async () => {
+    const svc = new SilentAudioService();
+    await svc.start();
+    await svc.playTick();
+    expect(mockCreateAsync).toHaveBeenCalledTimes(2);
+    expect(mockCreateAsync).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({ isLooping: false })
+    );
+    expect(mockPlayAsync).toHaveBeenCalledTimes(2);
   });
 });
