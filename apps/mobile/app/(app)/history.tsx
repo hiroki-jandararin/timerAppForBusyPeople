@@ -60,6 +60,25 @@ function calcCurrentStreak(byDate: Map<string, WorkoutHistory[]>): number {
   return streak;
 }
 
+function calcLongestStreak(byDate: Map<string, WorkoutHistory[]>): number {
+  const dates = Array.from(byDate.keys()).sort();
+  if (dates.length === 0) return 0;
+  let longest = 1;
+  let current = 1;
+  for (let i = 1; i < dates.length; i++) {
+    const prev = new Date(dates[i - 1] + 'T00:00:00');
+    prev.setDate(prev.getDate() + 1);
+    const prevNext = toDateString(prev.getFullYear(), prev.getMonth(), prev.getDate());
+    if (prevNext === dates[i]) {
+      current++;
+      if (current > longest) longest = current;
+    } else {
+      current = 1;
+    }
+  }
+  return longest;
+}
+
 function countThisMonth(byDate: Map<string, WorkoutHistory[]>): number {
   const now = new Date();
   const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -126,6 +145,7 @@ export default function HistoryScreen() {
 
   const byDate = groupByDate(histories);
   const currentStreak = calcCurrentStreak(byDate);
+  const longestStreak = calcLongestStreak(byDate);
   const thisMonthCount = countThisMonth(byDate);
 
   return (
@@ -150,6 +170,9 @@ export default function HistoryScreen() {
                 {currentStreak > 0 ? `🔥 ${currentStreak}` : `${currentStreak}`}
               </Text>
               <Text style={styles.statLabelStreak}>日連続</Text>
+              {longestStreak > 1 && (
+                <Text style={styles.statSubStreak}>最長 {longestStreak}日</Text>
+              )}
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statValue}>{histories.length}</Text>
@@ -202,6 +225,7 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 9, fontWeight: '900', color: '#505058', letterSpacing: 1, marginTop: 4 },
   statValueStreak: { fontSize: 26, fontWeight: '900', color: Colors.orange },
   statLabelStreak: { fontSize: 9, fontWeight: '900', color: '#FF6B3580', letterSpacing: 1, marginTop: 4 },
+  statSubStreak: { fontSize: 9, color: '#FF6B3580', marginTop: 2 },
   sectionLabel: { color: Colors.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 2, marginBottom: 10 },
   emptyState: { marginTop: 48, alignItems: 'center', gap: 6 },
   emptyText: { color: '#505058', fontSize: 14 },

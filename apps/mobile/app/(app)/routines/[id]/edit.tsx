@@ -1,5 +1,6 @@
 import RoutineForm from '@/components/RoutineForm';
 import { useAuth } from '@/contexts/AuthContext';
+import { generateAiRoutine } from '@/features/ai/aiRoutineService';
 import { routineApiClient, ApiError, type CreateRoutineInput } from '@timeapp/api-client';
 import type { Routine } from '@timeapp/core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -32,10 +33,15 @@ export default function EditRoutineScreen() {
     );
   }
 
+  const aiGenerator = token
+    ? (prompt: string, targetDurationSec?: number) => generateAiRoutine(token, prompt, targetDurationSec)
+    : undefined;
+
   return (
     <RoutineForm
       title="ルーティン編集"
       initialValues={routine}
+      generateAiRoutine={aiGenerator}
       onSubmit={async (input: CreateRoutineInput) => {
         await api.update(id, input);
         router.back();

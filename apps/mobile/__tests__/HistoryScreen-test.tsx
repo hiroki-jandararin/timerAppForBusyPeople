@@ -85,4 +85,89 @@ describe('HistoryScreen', () => {
     render(<HistoryScreen />);
     expect(await screen.findByText('まだ履歴がありません')).toBeTruthy();
   });
+
+  it('2日連続の履歴があるとき「最長 2日」が表示される', async () => {
+    render(<HistoryScreen />);
+    await screen.findByText('ワークアウト履歴');
+    expect(screen.getByText('最長 2日')).toBeTruthy();
+  });
+
+  it('1日のみの履歴のとき「最長 N日」は表示されない', async () => {
+    mockGetAll.mockResolvedValue([sampleHistories[0]]);
+    render(<HistoryScreen />);
+    await screen.findByText('ワークアウト履歴');
+    expect(screen.queryByText(/最長/)).toBeNull();
+  });
+
+  it('履歴がないとき「最長 N日」は表示されない', async () => {
+    mockGetAll.mockResolvedValue([]);
+    render(<HistoryScreen />);
+    await screen.findByText('まだ履歴がありません');
+    expect(screen.queryByText(/最長/)).toBeNull();
+  });
+});
+
+const makeHistory = (id: string, dateStr: string) => ({
+  id,
+  userId: 'u1',
+  routineId: 'r1',
+  routineName: 'テスト',
+  startedAt: `${dateStr}T09:00:00.000Z`,
+  finishedAt: `${dateStr}T09:20:00.000Z`,
+  completed: true,
+  itemsCount: 3,
+  itemsCompleted: 3,
+  createdAt: `${dateStr}T09:20:00.000Z`,
+});
+
+describe('HistoryScreen — longestStreak 計算ロジック (3.2)', () => {
+  it('3日連続のとき「最長 3日」が表示される', async () => {
+    mockGetAll.mockResolvedValue([
+      makeHistory('a', '2026-06-14'),
+      makeHistory('b', '2026-06-13'),
+      makeHistory('c', '2026-06-12'),
+    ]);
+    render(<HistoryScreen />);
+    await screen.findByText('ワークアウト履歴');
+    expect(screen.getByText('最長 3日')).toBeTruthy();
+  });
+
+  it('非連続日3つ（longestStreak=1）のとき「最長 N日」は表示されない', async () => {
+    mockGetAll.mockResolvedValue([
+      makeHistory('a', '2026-06-14'),
+      makeHistory('b', '2026-06-12'),
+      makeHistory('c', '2026-06-10'),
+    ]);
+    render(<HistoryScreen />);
+    await screen.findByText('ワークアウト履歴');
+    expect(screen.queryByText(/最長/)).toBeNull();
+  });
+
+  it('5日連続のあとギャップがある場合「最長 5日」が表示される', async () => {
+    mockGetAll.mockResolvedValue([
+      makeHistory('a', '2026-06-05'),
+      makeHistory('b', '2026-06-04'),
+      makeHistory('c', '2026-06-03'),
+      makeHistory('d', '2026-06-02'),
+      makeHistory('e', '2026-06-01'),
+      makeHistory('f', '2026-05-28'),
+    ]);
+    render(<HistoryScreen />);
+    await screen.findByText('ワークアウト履歴');
+    expect(screen.getByText('最長 5日')).toBeTruthy();
+  });
+});
+
+describe('HistoryScreen — API 取得・カレンダー表示 (4.3)', () => {
+  it('マウント時に API が呼ばれ履歴を取得する', async () => {
+    render(<HistoryScreen />);
+    await screen.findByText('ワークアウト履歴');
+    expect(mockGetAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('カレンダーヒートマップが表示される', async () => {
+    render(<HistoryScreen />);
+    await screen.findByText('ワークアウト履歴');
+    expect(screen.getByText(/年.*月/)).toBeTruthy();
+  });
 });

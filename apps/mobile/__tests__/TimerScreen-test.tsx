@@ -236,6 +236,26 @@ describe('TimerScreen — C9 QUEUEビュー切替', () => {
   });
 });
 
+describe('TimerScreen — C0 プレスタートカウントダウン (4.2)', () => {
+  it('スタートを押すとカウントダウンが表示される', async () => {
+    render(<TimerScreen />);
+    await screen.findByText('スタート');
+    fireEvent.press(screen.getByText('スタート'));
+    await act(async () => { jest.advanceTimersByTime(100); });
+    expect(screen.getByText('3')).toBeTruthy();
+    expect(screen.getByText('準備してください')).toBeTruthy();
+  });
+
+  it('カウントダウン完了後にタイマーが開始する', async () => {
+    render(<TimerScreen />);
+    await screen.findByText('スタート');
+    fireEvent.press(screen.getByText('スタート'));
+    await act(async () => { jest.advanceTimersByTime(3500); });
+    expect(screen.queryByText('準備してください')).toBeNull();
+    expect(screen.getByText('QUEUE')).toBeTruthy();
+  });
+});
+
 describe('TimerScreen — C8 ワークアウト履歴自動保存', () => {
   it('「終了する」を押すと completed: false で履歴が保存される', async () => {
     render(<TimerScreen />);
