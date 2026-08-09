@@ -45,10 +45,10 @@ jobs:
       - name: Lambda 用バイナリをビルド
         run: cd apps/backend && make zip
       - name: Lambda 関数を更新
-        uses: aws-actions/aws-lambda-deploy@v1
-        with:
-          function-name: ${{ secrets.AWS_LAMBDA_PROD_FUNCTION_NAME }}
-          zip-file: apps/backend/function.zip
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ secrets.AWS_LAMBDA_PROD_FUNCTION_NAME }} \
+            --zip-file fileb://apps/backend/function.zip
       - name: Deployment API に完了を記録
         uses: actions/github-script@v7
         with:
