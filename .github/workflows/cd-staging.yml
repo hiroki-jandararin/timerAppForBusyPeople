@@ -1,0 +1,112 @@
+name: CD Staging
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      web: ${{ steps.filter.outputs.web }}
+      mobile: ${{ steps.filter.outputs.mobile }}
+      packages: ${{ steps.filter.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'apps/backend/**'
+            web:
+              - 'apps/web/**'
+            mobile:
+              - 'apps/mobile/**'
+            packages:
+              - 'packages/**'
+
+  deploy-backend-staging:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: apps/backend/go.sum
+      - name: AWS 認証（OIDC）
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_STAGING_ROLE_ARN }}
+          aws-region: ap-northeast-1
+      - name: Lambda 用バイナリをビルド
+        run: cd apps/backend && make zip
+      - name: Lambda 関数を更新
+        uses: aws-actions/aws-lambda-deploy@v1
+        with:
+          function-name: ${{ secrets.AWS_LAMBDA_STAGING_FUNCTION_NAME }}
+          zip-file: apps/backend/function.zip
+
+  deploy-web-preview:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.packages == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - name: 依存関係インストール
+        run: npm ci
+      - name: Vercel 設定を取得
+        run: npx vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/web
+      - name: ビルド
+        run: npx vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/web
+      - name: プレビューデプロイ
+        id: deploy
+        run: |
+          url=$(npx vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | tail -1)
+          echo "preview_url=$url" >> $GITHUB_OUTPUT
+        working-directory: apps/web
+      - name: デプロイ URL を表示
+        run: echo "プレビュー URL ${{ steps.deploy.outputs.preview_url }}"
+
+  build-mobile-preview:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.mobile == 'true' || needs.detect-changes.outputs.packages == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - name: Expo / EAS セットアップ
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: 依存関係インストール
+        run: npm ci
+      - name: EAS preview ビルド
+        id: build
+        run: |
+          cd apps/mobile
+          eas build --platform ios --profile preview --non-interactive --json \
+            | tee /tmp/eas-build-output.json
+          echo "build_url=$(cat /tmp/eas-build-output.json | jq -r '.[0].buildUrl // "N/A"')" >> $GITHUB_OUTPUT
+      - name: ビルド URL を表示
+        run: echo "EAS ビルド URL ${{ steps.build.outputs.build_url }}"
