@@ -1,0 +1,33 @@
+name: Update package-lock.json (Linux)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: '対象ブランチ'
+        required: true
+        default: 'develop'
+
+jobs:
+  update-lock:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Linux 向け lock ファイルを再生成
+        run: npm install --package-lock-only
+      - name: 変更を確認
+        run: git diff --stat package-lock.json
+      - name: lock ファイルをコミット
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git diff --staged --quiet || git commit -m "chore: package-lock.json を Linux で再生成"
+          git push
