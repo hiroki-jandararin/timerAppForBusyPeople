@@ -29,6 +29,7 @@ export function App() {
   return (
     <AuthenticatedApp
       authService={authService}
+      getToken={getToken}
       createRoutineRepository={() => new GoRoutineRepository(getToken)}
       historyRepository={new GoWorkoutHistoryRepository(getToken)}
       generateAiRoutine={(prompt, targetDurationSec) =>
@@ -40,6 +41,7 @@ export function App() {
 
 type AuthenticatedAppProps = {
   authService: AuthService;
+  getToken: () => Promise<string | null>;
   createRoutineRepository: CreateRoutineRepository;
   historyRepository: WorkoutHistoryRepository;
   generateAiRoutine: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
@@ -47,6 +49,7 @@ type AuthenticatedAppProps = {
 
 export function AuthenticatedApp({
   authService,
+  getToken,
   createRoutineRepository,
   historyRepository,
   generateAiRoutine,
@@ -54,6 +57,7 @@ export function AuthenticatedApp({
   return (
     <AuthProvider authService={authService}>
       <AppShell
+        getToken={getToken}
         createRoutineRepository={createRoutineRepository}
         historyRepository={historyRepository}
         generateAiRoutine={generateAiRoutine}
@@ -63,12 +67,14 @@ export function AuthenticatedApp({
 }
 
 type AppShellProps = {
+  getToken: () => Promise<string | null>;
   createRoutineRepository: CreateRoutineRepository;
   historyRepository: WorkoutHistoryRepository;
   generateAiRoutine: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
 };
 
 function AppShell({
+  getToken,
   createRoutineRepository,
   historyRepository,
   generateAiRoutine,
