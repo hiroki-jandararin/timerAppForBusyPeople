@@ -92,7 +92,7 @@ function AppShell({
   const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 
   async function deleteAccount() {
-    const token = await authService.getAccessToken();
+    const token = await getToken();
     const res = await fetch(`${BASE_URL}/users/me`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
