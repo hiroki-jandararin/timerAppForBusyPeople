@@ -11,7 +11,8 @@ export type TimerAction =
   | { type: 'skip'; routine: Routine }
   | { type: 'previous'; routine: Routine }
   | { type: 'finish' }
-  | { type: 'end' };
+  | { type: 'end' }
+  | { type: 'restore'; state: TimerState };
 
 export const initialTimerState: TimerState = {
   routineId: '',
@@ -67,6 +68,8 @@ export function timerReducer(state: TimerState, action: TimerAction): TimerState
       return { ...state, remainingSec: 0, status: 'finished' };
     case 'end':
       return initialTimerState;
+    case 'restore':
+      return action.state;
     default:
       return state;
   }

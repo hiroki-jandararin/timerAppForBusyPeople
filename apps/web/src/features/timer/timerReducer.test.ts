@@ -92,4 +92,15 @@ describe('timerReducer', () => {
     expect(previous.remainingSec).toBe(2);
     expect(timerReducer(previous, { type: 'previous', routine }).currentIndex).toBe(0);
   });
+
+  it('restoreすると渡したstateにそのまま置き換わる（永続化からの復元用）', () => {
+    const restored = {
+      routineId: 'r1',
+      currentIndex: 2,
+      remainingSec: 42,
+      status: 'paused' as const,
+    };
+
+    expect(timerReducer(initialTimerState, { type: 'restore', state: restored })).toEqual(restored);
+  });
 });
