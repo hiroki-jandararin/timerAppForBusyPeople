@@ -18,7 +18,17 @@ jest.mock('expo-speech');
 jest.mock('expo-keep-awake');
 jest.mock('expo-av', () => ({
   Audio: {
-    Sound: { createAsync: jest.fn().mockResolvedValue({ sound: { playAsync: jest.fn(), stopAsync: jest.fn(), unloadAsync: jest.fn() } }) },
+    Sound: {
+      createAsync: jest.fn().mockResolvedValue({
+        sound: {
+          playAsync: jest.fn().mockResolvedValue(undefined),
+          stopAsync: jest.fn(),
+          unloadAsync: jest.fn(),
+          getStatusAsync: jest.fn().mockResolvedValue({ isLoaded: true, isPlaying: true }),
+          setOnPlaybackStatusUpdate: jest.fn(),
+        },
+      }),
+    },
     setAudioModeAsync: jest.fn(),
   },
   InterruptionModeIOS: { MixWithOthers: 0, DoNotMix: 1, DuckOthers: 2 },
@@ -30,9 +40,17 @@ jest.mock('react-native-gesture-handler', () => {
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 44, bottom: 0, left: 0, right: 0 }),
 }));
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: (...args: unknown[]) => mockAsyncStorageGetItem(...args),
+  setItem: (...args: unknown[]) => mockAsyncStorageSetItem(...args),
+  removeItem: (...args: unknown[]) => mockAsyncStorageRemoveItem(...args),
+}));
 
 const mockGetById = jest.fn();
 const mockCreateHistory = jest.fn();
+const mockAsyncStorageGetItem = jest.fn();
+const mockAsyncStorageSetItem = jest.fn();
+const mockAsyncStorageRemoveItem = jest.fn();
 
 const sampleRoutine = {
   id: 'r1',
@@ -71,6 +89,7 @@ beforeEach(() => {
   (useRouter as jest.Mock).mockReturnValue({ back: jest.fn() });
   (useLocalSearchParams as jest.Mock).mockReturnValue({ id: 'r1' });
   mockGetById.mockResolvedValue(sampleRoutine);
+  mockAsyncStorageGetItem.mockResolvedValue(null);
 });
 
 describe('TimerScreen — C3 QUEUE グループ表示', () => {
@@ -288,5 +307,83 @@ describe('TimerScreen — C8 ワークアウト履歴自動保存', () => {
         itemsCompleted: sampleRoutine.items.length,
       })
     );
+  });
+});
+
+describe('TimerScreen — C10 アプリ再起動後のセッション復元', () => {
+  it('実行中に永続化されたセッションがあれば、起動時にidleを飛ばして復元する', async () => {
+    mockAsyncStorageGetItem.mockResolvedValue(
+      JSON.stringify({
+        routine: sampleRoutine,
+        state: { routineId: 'r1', currentIndex: 0, remainingSec: 20, status: 'running' },
+        anchorAtMs: Date.now(),
+        plannedStartAtMs: Date.now(),
+        plannedEndAtMs: Date.now() + 270000,
+        startedAtMs: Date.now(),
+      })
+    );
+
+    render(<TimerScreen />);
+
+    await screen.findByText('QUEUE');
+    expect(screen.queryByText('スタート')).toBeNull();
+  });
+
+  it('経過時間分を早送りしてから復元する', async () => {
+    const anchorAtMs = Date.now();
+    mockAsyncStorageGetItem.mockResolvedValue(
+      JSON.stringify({
+        routine: sampleRoutine,
+        state: { routineId: 'r1', currentIndex: 0, remainingSec: 20, status: 'running' },
+        anchorAtMs,
+        plannedStartAtMs: anchorAtMs,
+        plannedEndAtMs: anchorAtMs + 270000,
+        startedAtMs: anchorAtMs,
+      })
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(15000); // アプリがバックグラウンド/終了していた15秒間
+    });
+
+    render(<TimerScreen />);
+    await screen.findByText('QUEUE');
+
+    expect(screen.getByText('00:05')).toBeTruthy(); // 20秒 - 経過15秒
+  });
+
+  it('一時停止中に永続化されたセッションは一時停止のまま復元する', async () => {
+    mockAsyncStorageGetItem.mockResolvedValue(
+      JSON.stringify({
+        routine: sampleRoutine,
+        state: { routineId: 'r1', currentIndex: 0, remainingSec: 20, status: 'paused' },
+        anchorAtMs: Date.now(),
+        plannedStartAtMs: Date.now(),
+        plannedEndAtMs: Date.now() + 270000,
+        startedAtMs: Date.now(),
+      })
+    );
+
+    render(<TimerScreen />);
+    await screen.findByText('QUEUE');
+
+    expect(screen.getByText('00:20')).toBeTruthy();
+  });
+
+  it('終了済みの永続化セッションは復元せずidleから開始する', async () => {
+    mockAsyncStorageGetItem.mockResolvedValue(
+      JSON.stringify({
+        routine: sampleRoutine,
+        state: { routineId: 'r1', currentIndex: 5, remainingSec: 0, status: 'finished' },
+        anchorAtMs: Date.now(),
+        plannedStartAtMs: null,
+        plannedEndAtMs: null,
+        startedAtMs: null,
+      })
+    );
+
+    render(<TimerScreen />);
+
+    expect(await screen.findByText('スタート')).toBeTruthy();
   });
 });

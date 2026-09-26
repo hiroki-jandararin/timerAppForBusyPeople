@@ -19,6 +19,11 @@ import { ExpoSpeechVoiceService } from '@/features/voice/expoSpeechVoiceService'
 import { ExpoKeepAwakeService } from '@/features/wakeLock/expoKeepAwakeService';
 import { SilentAudioService } from '@/features/backgroundTimer/silentAudioService';
 import { reorderUpcoming } from '@/features/timer/reorderUpcoming';
+import {
+  clearTimerSession,
+  loadTimerSession,
+  saveTimerSession,
+} from '@/features/timer/timerSessionStore';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import {
@@ -437,14 +442,51 @@ export default function TimerScreen() {
   }, [nowMs, hasShownAdjustment, activeRoutine, plannedEndAtMs, state]);
 
   useEffect(() => {
-    api.getById(id).then((r) => {
-      setRoutine(r);
-      setActiveRoutine(r);
-    }).catch((e) => {
-      if (e instanceof ApiError && e.status === 401) signOut();
-      else router.back();
-    });
+    Promise.all([api.getById(id), loadTimerSession(id)])
+      .then(([r, session]) => {
+        setRoutine(r);
+        const canRestore =
+          session && (session.state.status === 'running' || session.state.status === 'paused');
+        if (!canRestore) {
+          setActiveRoutine(r);
+          return;
+        }
+        setActiveRoutine(session.routine);
+        plannedStartAtMs.current = session.plannedStartAtMs;
+        startedAtMsRef.current = session.startedAtMs;
+        setPlannedEndAtMs(session.plannedEndAtMs);
+        rawDispatch({ type: 'restore', state: session.state });
+        if (session.state.status === 'running') {
+          // 音声・ビープ等の副作用は鳴らさず、経過秒数分だけ静かに早送りする
+          const elapsedSec = Math.floor((Date.now() - session.anchorAtMs) / 1000);
+          lastTickAtRef.current = Date.now();
+          for (let i = 0; i < elapsedSec; i++) {
+            rawDispatch({ type: 'tick', routine: session.routine });
+          }
+        }
+      })
+      .catch((e) => {
+        if (e instanceof ApiError && e.status === 401) signOut();
+        else router.back();
+      });
   }, [id]);
+
+  // running/paused中は定期的にセッションを永続化し、アプリの強制終了・再起動後も復元できるようにする
+  useEffect(() => {
+    if (!routine) return;
+    if (state.status === 'running' || state.status === 'paused') {
+      void saveTimerSession(id, {
+        routine: activeRoutine ?? routine,
+        state,
+        anchorAtMs: Date.now(),
+        plannedStartAtMs: plannedStartAtMs.current,
+        plannedEndAtMs,
+        startedAtMs: startedAtMsRef.current,
+      });
+    } else {
+      void clearTimerSession(id);
+    }
+  }, [id, routine, activeRoutine, state, plannedEndAtMs]);
 
   useEffect(() => {
     if (state.status !== 'running' && state.status !== 'countdown') return;
@@ -456,11 +498,15 @@ export default function TimerScreen() {
     return () => clearInterval(interval);
   }, [state.status, activeRoutine, routine]);
 
-  // 前台復帰時にバックグラウンド中の経過分を補完
+  // 前台復帰時にバックグラウンド中の経過分を補完し、無音再生が止まっていれば復旧する
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState !== 'active') return;
-      if (stateRef.current.status !== 'running') return;
+      const status = stateRef.current.status;
+      if (status === 'running' || status === 'countdown' || status === 'paused') {
+        void silentAudio.ensurePlaying();
+      }
+      if (status !== 'running') return;
       if (!lastTickAtRef.current) return;
       const elapsed = Math.floor((Date.now() - lastTickAtRef.current) / 1000);
       if (elapsed < 2) return;
@@ -473,7 +519,7 @@ export default function TimerScreen() {
       suppressVoiceRef.current = false;
     });
     return () => sub.remove();
-  }, [activeRoutine, routine]);
+  }, [activeRoutine, routine, silentAudio]);
 
   useEffect(() => {
     if (!routine || state.status !== 'running') return;
