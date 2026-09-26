@@ -35,4 +35,6 @@ jobs:
       - name: ビルド URL を表示
         run: echo "EAS ビルド URL ${{ steps.build.outputs.build_url }}"
       - name: App Store Connect へ提出
+        env:
+          APP_ENV: production
         run: cd apps/mobile && eas submit --platform ios --profile production --latest --non-interactive
