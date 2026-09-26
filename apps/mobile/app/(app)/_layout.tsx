@@ -1,7 +1,7 @@
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { Stack, useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActionSheetIOS, Pressable, StyleSheet, Text } from 'react-native';
 
 function BackButton() {
   const router = useRouter();
@@ -12,11 +12,33 @@ function BackButton() {
   );
 }
 
-function SignOutButton() {
+function MenuButton() {
   const { signOut } = useAuth();
+  const router = useRouter();
+
+  const handlePress = () => {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: ['キャンセル', 'アカウント', 'サインアウト'],
+        cancelButtonIndex: 0,
+        destructiveButtonIndex: 2,
+      },
+      (index) => {
+        if (index === 1) router.push('/(app)/account');
+        if (index === 2) signOut();
+      }
+    );
+  };
+
   return (
-    <Pressable onPress={signOut} hitSlop={8}>
-      <Text style={{ color: Colors.textMuted, fontSize: 13 }}>サインアウト</Text>
+    <Pressable
+      onPress={handlePress}
+      hitSlop={12}
+      style={({ pressed }) => [headerStyles.menuBtn, pressed && { opacity: 0.5 }]}
+    >
+      <Text style={headerStyles.menuDot}>•</Text>
+      <Text style={headerStyles.menuDot}>•</Text>
+      <Text style={headerStyles.menuDot}>•</Text>
     </Pressable>
   );
 }
@@ -46,6 +68,14 @@ const headerStyles = StyleSheet.create({
   },
   historyIcon: { color: Colors.orange, fontSize: 14, lineHeight: 17 },
   historyText: { color: Colors.orange, fontSize: 13, fontWeight: '700' },
+  menuBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  menuDot: { color: Colors.textSub, fontSize: 18, lineHeight: 20 },
 });
 
 export default function AppLayout() {
@@ -65,7 +95,7 @@ export default function AppLayout() {
           headerShown: true,
           title: 'マイルーティン',
           headerLeft: () => <HistoryButton />,
-          headerRight: () => <SignOutButton />,
+          headerRight: () => <MenuButton />,
         }}
       />
       <Stack.Screen name="routines/new" options={{ headerShown: true, title: 'ルーティン作成', headerLeft: () => <BackButton /> }} />
@@ -75,6 +105,7 @@ export default function AppLayout() {
       <Stack.Screen name="routines/templates" options={{ headerShown: true, title: 'テンプレート', headerLeft: () => <BackButton /> }} />
       <Stack.Screen name="history" options={{ headerShown: false }} />
       <Stack.Screen name="routines/ai-prompt" options={{ headerShown: false }} />
+      <Stack.Screen name="account" options={{ headerShown: true, title: 'アカウント', headerLeft: () => <BackButton /> }} />
     </Stack>
   );
 }

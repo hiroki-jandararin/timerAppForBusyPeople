@@ -8,4 +8,10 @@ export class BrowserVoiceService implements VoiceService {
     utterance.lang = 'ja-JP';
     window.speechSynthesis.speak(utterance);
   }
+
+  stop(): void {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
 }

@@ -1,6 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/colors';
 import { useState } from 'react';
+import * as Linking from 'expo-linking';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -12,33 +13,32 @@ import {
   View,
 } from 'react-native';
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 
 async function signInWithEmail(email: string, password: string): Promise<string> {
-const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+  const res = await fetch(`${API_BASE_URL}/auth/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error('signIn error', res.status, JSON.stringify(body));
-    throw new Error(body.error_description ?? body.msg ?? JSON.stringify(body) ?? 'サインインに失敗しました');
+    const text = await res.text().catch(() => 'サインインに失敗しました');
+    throw new Error(text);
   }
   const data = await res.json();
-  return data.access_token as string;
+  return data.accessToken as string;
 }
 
 async function signUpWithEmail(email: string, password: string): Promise<void> {
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+  const redirectTo = Linking.createURL('auth/callback');
+  const res = await fetch(`${API_BASE_URL}/auth/register`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
-    body: JSON.stringify({ email, password, options: { redirect_to: 'quickfit://auth/callback' } }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, redirect_to: redirectTo }),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.msg ?? body.error_description ?? 'サインアップに失敗しました');
+    const text = await res.text().catch(() => 'サインアップに失敗しました');
+    throw new Error(text);
   }
 }
 
@@ -125,6 +125,10 @@ export default function SignInScreen() {
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
+            {mode === 'signin' ? (
+              <Text style={styles.hint}>※ アカウント作成後はメールの確認が必要です</Text>
+            ) : null}
+
             <Pressable
               style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
               onPress={handleSubmit}
@@ -183,6 +187,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   error: { color: Colors.red, fontSize: 13, textAlign: 'center' },
+  hint: { color: Colors.textMuted, fontSize: 12, textAlign: 'center' },
   button: {
     backgroundColor: Colors.orange,
     borderRadius: 12,

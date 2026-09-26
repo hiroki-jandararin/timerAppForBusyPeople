@@ -1,0 +1,38 @@
+name: CD Mobile Production
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/**'
+
+jobs:
+  build-submit-ios:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - name: Expo / EAS セットアップ
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: 依存関係インストール
+        run: npm ci
+      - name: EAS production ビルド
+        id: build
+        run: |
+          cd apps/mobile
+          eas build --platform ios --profile production --non-interactive --json \
+            | tee /tmp/eas-build-output.json
+          echo "build_url=$(cat /tmp/eas-build-output.json | jq -r '.[0].buildUrl // "N/A"')" >> $GITHUB_OUTPUT
+      - name: ビルド URL を表示
+        run: echo "EAS ビルド URL ${{ steps.build.outputs.build_url }}"
+      - name: App Store Connect へ提出
+        run: cd apps/mobile && eas submit --platform ios --profile production --latest --non-interactive

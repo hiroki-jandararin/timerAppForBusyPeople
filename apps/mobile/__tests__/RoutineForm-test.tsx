@@ -343,6 +343,104 @@ describe('RoutineForm — セット回数設定', () => {
   });
 });
 
+describe('RoutineForm — エクサイズピッカー', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('「種目から追加」ボタンが常に表示される', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    expect(screen.getByText('種目から追加')).toBeTruthy();
+  });
+
+  it('「種目から追加」を押すと筋肉グループと種目一覧が表示される', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('種目から追加'));
+    expect(screen.getByText('胸')).toBeTruthy();
+    expect(screen.getByText('ベンチプレス')).toBeTruthy();
+  });
+
+  it('「種目から追加」を再押しするとピッカーが閉じる', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('種目から追加'));
+    fireEvent.press(screen.getByText('種目から追加'));
+    expect(screen.queryByText('ベンチプレス')).toBeNull();
+  });
+
+  it('種目ボタンをタップするとその種目名でアイテムが追加される', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    const before = screen.getAllByTestId('drag-handle').length;
+    fireEvent.press(screen.getByText('種目から追加'));
+    fireEvent.press(screen.getByText('ベンチプレス'));
+    expect(screen.getAllByTestId('drag-handle').length).toBe(before + 1);
+    expect(screen.getByText('ベンチプレス')).toBeTruthy();
+  });
+
+  it('正の整数の回数を入力して種目を追加すると「N回」が末尾に付く', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('種目から追加'));
+    fireEvent.changeText(screen.getByPlaceholderText('回数'), '10');
+    fireEvent.press(screen.getByText('ベンチプレス'));
+    expect(screen.getByText('ベンチプレス 10回')).toBeTruthy();
+  });
+
+  it('回数が0のときは回数サフィックスが付かない', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('種目から追加'));
+    fireEvent.changeText(screen.getByPlaceholderText('回数'), '0');
+    fireEvent.press(screen.getByText('ベンチプレス'));
+    expect(screen.getByText('ベンチプレス')).toBeTruthy();
+    expect(screen.queryByText(/0回/)).toBeNull();
+  });
+
+  it('回数が負の値のときは回数サフィックスが付かない', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('種目から追加'));
+    fireEvent.changeText(screen.getByPlaceholderText('回数'), '-5');
+    fireEvent.press(screen.getByText('ベンチプレス'));
+    expect(screen.getByText('ベンチプレス')).toBeTruthy();
+    expect(screen.queryByText(/-5回/)).toBeNull();
+  });
+
+  it('種目を追加するとピッカーが閉じる', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('種目から追加'));
+    fireEvent.press(screen.getByText('ベンチプレス'));
+    expect(screen.queryByPlaceholderText('回数')).toBeNull();
+  });
+
+  it('種目を追加しても pickerReps はリセットされない', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('種目から追加'));
+    fireEvent.changeText(screen.getByPlaceholderText('回数'), '8');
+    fireEvent.press(screen.getByText('ベンチプレス'));
+    fireEvent.press(screen.getByText('種目から追加'));
+    expect(screen.getByPlaceholderText('回数').props.value).toBe('8');
+  });
+
+  it('「空白で追加」でタイトル空の workout アイテムが追加される', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    const before = screen.getAllByTestId('drag-handle').length;
+    fireEvent.press(screen.getByText('種目から追加'));
+    fireEvent.press(screen.getByText('空白で追加'));
+    expect(screen.getAllByTestId('drag-handle').length).toBe(before + 1);
+  });
+
+  it('ピッカーを開くと AI パネルが閉じる', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} generateAiRoutine={jest.fn()} />);
+    fireEvent.press(screen.getByText('AI で追加'));
+    expect(screen.getByText('部位')).toBeTruthy();
+    fireEvent.press(screen.getByText('種目から追加'));
+    expect(screen.queryByText('部位')).toBeNull();
+  });
+
+  it('AI パネルを開くとピッカーが閉じる', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} generateAiRoutine={jest.fn()} />);
+    fireEvent.press(screen.getByText('種目から追加'));
+    expect(screen.getByText('ベンチプレス')).toBeTruthy();
+    fireEvent.press(screen.getByText('AI で追加'));
+    expect(screen.queryByText('ベンチプレス')).toBeNull();
+  });
+});
+
 describe('RoutineForm — インターバル単体追加', () => {
   it('「インターバルを追加」ボタンが存在する', () => {
     render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);

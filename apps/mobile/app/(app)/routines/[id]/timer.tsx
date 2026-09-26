@@ -19,6 +19,11 @@ import { ExpoSpeechVoiceService } from '@/features/voice/expoSpeechVoiceService'
 import { ExpoKeepAwakeService } from '@/features/wakeLock/expoKeepAwakeService';
 import { SilentAudioService } from '@/features/backgroundTimer/silentAudioService';
 import { reorderUpcoming } from '@/features/timer/reorderUpcoming';
+import {
+  clearTimerSession,
+  loadTimerSession,
+  saveTimerSession,
+} from '@/features/timer/timerSessionStore';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import {
@@ -111,10 +116,12 @@ const SPRING_CFG = { tension: 300, friction: 30, useNativeDriver: false } as con
 type QueueListProps = {
   groups: ExerciseGroup[];
   onDragEnd: (newGroups: ExerciseGroup[]) => void;
+  onDragStart?: () => void;
+  onDragFinish?: () => void;
   renderItem: (group: ExerciseGroup, drag: () => void, isActive: boolean) => React.ReactNode;
 };
 
-function QueueList({ groups, onDragEnd, renderItem }: QueueListProps) {
+function QueueList({ groups, onDragEnd, onDragStart, onDragFinish, renderItem }: QueueListProps) {
   const STEP = QUEUE_ITEM_H + QUEUE_GAP;
 
   // スロットごとのtop位置アニメーション（インデックス順に管理）
@@ -131,10 +138,14 @@ function QueueList({ groups, onDragEnd, renderItem }: QueueListProps) {
   const overRef = useRef<number | null>(null);
   const groupsRef = useRef(groups);
   const onDragEndRef = useRef(onDragEnd);
+  const onDragStartRef = useRef(onDragStart);
+  const onDragFinishRef = useRef(onDragFinish);
   const containerRef = useRef<View>(null);
   const containerTopRef = useRef(0);
   groupsRef.current = groups;
   onDragEndRef.current = onDragEnd;
+  onDragStartRef.current = onDragStart;
+  onDragFinishRef.current = onDragFinish;
 
   // グループ変更後（並び替え完了後）に全スロットを正規位置にリセット
   useEffect(() => {
@@ -192,6 +203,7 @@ function QueueList({ groups, onDragEnd, renderItem }: QueueListProps) {
           // 着地後、destinationスロットを正規位置に初期化（再レンダリング時のジャンプ防止）
           animTops.current[dest]?.setValue(dest * STEP);
           setActiveIdx(null);
+          onDragFinishRef.current?.();
           if (to !== null && from !== to) {
             const next = [...groupsRef.current];
             const [moved] = next.splice(from, 1);
@@ -213,6 +225,7 @@ function QueueList({ groups, onDragEnd, renderItem }: QueueListProps) {
             if (i !== from) Animated.spring(animTops.current[i]!, { toValue: i * STEP, ...SPRING_CFG }).start();
           });
           setActiveIdx(null);
+          onDragFinishRef.current?.();
         });
       },
     })
@@ -253,6 +266,7 @@ function QueueList({ groups, onDragEnd, renderItem }: QueueListProps) {
                 activeRef.current = index;
                 overRef.current = index;
                 setActiveIdx(index);
+                onDragStartRef.current?.();
               },
               isActive,
             )}
@@ -279,6 +293,7 @@ export default function TimerScreen() {
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
   const [hasShownAdjustment, setHasShownAdjustment] = useState(false);
   const [queueView, setQueueView] = useState<'set' | 'all'>('set');
+  const [isDraggingQueue, setIsDraggingQueue] = useState(false);
   const plannedStartAtMs = useRef<number | null>(null);
   const startedAtMsRef = useRef<number | null>(null);
   const wasManualFinishRef = useRef(false);
@@ -309,7 +324,7 @@ export default function TimerScreen() {
       setPlannedEndAtMs(endMs);
       setHasShownAdjustment(false);
       setIsAdjustmentOpen(false);
-      void silentAudio.start();
+      void silentAudio.start().then(() => void silentAudio.playTick());
     }
     if (action.type === 'finish') {
       wasManualFinishRef.current = true;
@@ -324,6 +339,21 @@ export default function TimerScreen() {
       setIsAdjustmentOpen(false);
       setHasShownAdjustment(false);
       void silentAudio.stop();
+    }
+    if (previous.status === 'countdown' && next.status === 'countdown') {
+      void silentAudio.playTick();
+    }
+    if (previous.status === 'countdown' && next.status === 'running') {
+      void silentAudio.playBeep();
+    }
+    if (
+      next.status === 'running' &&
+      previous.currentIndex !== next.currentIndex
+    ) {
+      void silentAudio.playBeep();
+    }
+    if (previous.status !== 'finished' && next.status === 'finished') {
+      void silentAudio.playBeep();
     }
     if (!suppressVoiceRef.current) {
       if (action.type === 'skip' || action.type === 'previous') {
@@ -412,14 +442,51 @@ export default function TimerScreen() {
   }, [nowMs, hasShownAdjustment, activeRoutine, plannedEndAtMs, state]);
 
   useEffect(() => {
-    api.getById(id).then((r) => {
-      setRoutine(r);
-      setActiveRoutine(r);
-    }).catch((e) => {
-      if (e instanceof ApiError && e.status === 401) signOut();
-      else router.back();
-    });
+    Promise.all([api.getById(id), loadTimerSession(id)])
+      .then(([r, session]) => {
+        setRoutine(r);
+        const canRestore =
+          session && (session.state.status === 'running' || session.state.status === 'paused');
+        if (!canRestore) {
+          setActiveRoutine(r);
+          return;
+        }
+        setActiveRoutine(session.routine);
+        plannedStartAtMs.current = session.plannedStartAtMs;
+        startedAtMsRef.current = session.startedAtMs;
+        setPlannedEndAtMs(session.plannedEndAtMs);
+        rawDispatch({ type: 'restore', state: session.state });
+        if (session.state.status === 'running') {
+          // 音声・ビープ等の副作用は鳴らさず、経過秒数分だけ静かに早送りする
+          const elapsedSec = Math.floor((Date.now() - session.anchorAtMs) / 1000);
+          lastTickAtRef.current = Date.now();
+          for (let i = 0; i < elapsedSec; i++) {
+            rawDispatch({ type: 'tick', routine: session.routine });
+          }
+        }
+      })
+      .catch((e) => {
+        if (e instanceof ApiError && e.status === 401) signOut();
+        else router.back();
+      });
   }, [id]);
+
+  // running/paused中は定期的にセッションを永続化し、アプリの強制終了・再起動後も復元できるようにする
+  useEffect(() => {
+    if (!routine) return;
+    if (state.status === 'running' || state.status === 'paused') {
+      void saveTimerSession(id, {
+        routine: activeRoutine ?? routine,
+        state,
+        anchorAtMs: Date.now(),
+        plannedStartAtMs: plannedStartAtMs.current,
+        plannedEndAtMs,
+        startedAtMs: startedAtMsRef.current,
+      });
+    } else {
+      void clearTimerSession(id);
+    }
+  }, [id, routine, activeRoutine, state, plannedEndAtMs]);
 
   useEffect(() => {
     if (state.status !== 'running' && state.status !== 'countdown') return;
@@ -431,11 +498,15 @@ export default function TimerScreen() {
     return () => clearInterval(interval);
   }, [state.status, activeRoutine, routine]);
 
-  // 前台復帰時にバックグラウンド中の経過分を補完
+  // 前台復帰時にバックグラウンド中の経過分を補完し、無音再生が止まっていれば復旧する
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState !== 'active') return;
-      if (stateRef.current.status !== 'running') return;
+      const status = stateRef.current.status;
+      if (status === 'running' || status === 'countdown' || status === 'paused') {
+        void silentAudio.ensurePlaying();
+      }
+      if (status !== 'running') return;
       if (!lastTickAtRef.current) return;
       const elapsed = Math.floor((Date.now() - lastTickAtRef.current) / 1000);
       if (elapsed < 2) return;
@@ -448,7 +519,7 @@ export default function TimerScreen() {
       suppressVoiceRef.current = false;
     });
     return () => sub.remove();
-  }, [activeRoutine, routine]);
+  }, [activeRoutine, routine, silentAudio]);
 
   useEffect(() => {
     if (!routine || state.status !== 'running') return;
@@ -562,8 +633,6 @@ export default function TimerScreen() {
     outputRange: [RING_CIRCUMFERENCE, 0],
   });
 
-  const overallProgress = ar.items.length > 0 ? (state.currentIndex / ar.items.length) * 100 : 0;
-
   const isWarning = state.remainingSec > 0 && state.remainingSec <= 3;
   const ringColor = isWarning ? Colors.yellow : accentColor;
 
@@ -646,17 +715,8 @@ export default function TimerScreen() {
         </Text>
       </View>
 
-      {/* 下部: 全体進捗＋コントロール＋終了 */}
+      {/* 下部: コントロール＋終了 */}
       <View style={styles.bottomArea}>
-        <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${overallProgress}%`, backgroundColor: Colors.orange },
-            ]}
-          />
-        </View>
-
         <Text style={styles.nextLabel} numberOfLines={1}>
           {ar.items[state.currentIndex + 1] ? (
             <>
@@ -737,9 +797,16 @@ export default function TimerScreen() {
             </View>
           </View>
           {queueView === 'set' ? (
+            <ScrollView
+              style={styles.queueScroll}
+              scrollEnabled={!isDraggingQueue}
+              showsVerticalScrollIndicator={false}
+            >
             <QueueList
               groups={groups}
               onDragEnd={handleQueueReorder}
+              onDragStart={() => setIsDraggingQueue(true)}
+              onDragFinish={() => setIsDraggingQueue(false)}
               renderItem={(group, drag, isActive) => (
                 <Pressable
                   testID={`queue-item-${group.itemStart}`}
@@ -787,8 +854,9 @@ export default function TimerScreen() {
                 </Pressable>
               )}
             />
+            </ScrollView>
           ) : (
-            <ScrollView style={styles.allViewScroll} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.queueScroll} showsVerticalScrollIndicator={false}>
               {ar.items.map((item, index) => {
                 const isDone = index < state.currentIndex;
                 const isCurrent = index === state.currentIndex;
@@ -889,6 +957,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
+    paddingBottom: 24,
   },
   ringWrapper: {
     width: 240,
@@ -932,13 +1001,6 @@ const styles = StyleSheet.create({
   bottomArea: {
     gap: 12,
   },
-  progressTrack: {
-    height: 4,
-    backgroundColor: Colors.cardBorder,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: { height: '100%', borderRadius: 2 },
   controls: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -1051,8 +1113,8 @@ const styles = StyleSheet.create({
   toggleBtnText: { color: Colors.textMuted, fontSize: 11, fontWeight: '700' },
   toggleBtnTextActive: { color: Colors.orange },
   queueItemTitleInterval: { color: Colors.textSub },
+  queueScroll: { height: 180 },
   // 全表示モード
-  allViewScroll: { maxHeight: 220 },
   allViewRest: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -34,3 +34,8 @@ Thumbs.db
 
 # Vercel
 .vercel/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+.kiro

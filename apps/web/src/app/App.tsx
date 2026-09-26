@@ -29,6 +29,7 @@ export function App() {
   return (
     <AuthenticatedApp
       authService={authService}
+      getToken={getToken}
       createRoutineRepository={() => new GoRoutineRepository(getToken)}
       historyRepository={new GoWorkoutHistoryRepository(getToken)}
       generateAiRoutine={(prompt, targetDurationSec) =>
@@ -40,6 +41,7 @@ export function App() {
 
 type AuthenticatedAppProps = {
   authService: AuthService;
+  getToken: () => Promise<string | null>;
   createRoutineRepository: CreateRoutineRepository;
   historyRepository: WorkoutHistoryRepository;
   generateAiRoutine: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
@@ -47,6 +49,7 @@ type AuthenticatedAppProps = {
 
 export function AuthenticatedApp({
   authService,
+  getToken,
   createRoutineRepository,
   historyRepository,
   generateAiRoutine,
@@ -54,6 +57,7 @@ export function AuthenticatedApp({
   return (
     <AuthProvider authService={authService}>
       <AppShell
+        getToken={getToken}
         createRoutineRepository={createRoutineRepository}
         historyRepository={historyRepository}
         generateAiRoutine={generateAiRoutine}
@@ -63,12 +67,14 @@ export function AuthenticatedApp({
 }
 
 type AppShellProps = {
+  getToken: () => Promise<string | null>;
   createRoutineRepository: CreateRoutineRepository;
   historyRepository: WorkoutHistoryRepository;
   generateAiRoutine: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
 };
 
 function AppShell({
+  getToken,
   createRoutineRepository,
   historyRepository,
   generateAiRoutine,
@@ -83,6 +89,18 @@ function AppShell({
     return <AuthPage onSignIn={auth.signIn} onSignUp={auth.signUp} />;
   }
 
+  const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+
+  async function deleteAccount() {
+    const token = await getToken();
+    const res = await fetch(`${BASE_URL}/users/me`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`アカウント削除に失敗しました: ${res.status}`);
+    await auth.signOut();
+  }
+
   return (
     <RoutineApp
       user={auth.user}
@@ -90,6 +108,7 @@ function AppShell({
       historyRepository={historyRepository}
       generateAiRoutine={generateAiRoutine}
       onSignOut={auth.signOut}
+      onDeleteAccount={deleteAccount}
     />
   );
 }
@@ -100,6 +119,7 @@ type RoutineAppProps = {
   historyRepository: WorkoutHistoryRepository;
   generateAiRoutine: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
   onSignOut: () => Promise<void>;
+  onDeleteAccount: () => Promise<void>;
 };
 
 function RoutineApp({
@@ -108,6 +128,7 @@ function RoutineApp({
   historyRepository,
   generateAiRoutine,
   onSignOut,
+  onDeleteAccount,
 }: RoutineAppProps) {
   const repository = useMemo(() => createRoutineRepository(user), [createRoutineRepository, user]);
   const voiceService = useMemo<VoiceService>(() => new BrowserVoiceService(), []);
@@ -169,6 +190,7 @@ function RoutineApp({
       generateAiRoutine={generateAiRoutine}
       currentUserEmail={user.email}
       onSignOut={onSignOut}
+      onDeleteAccount={onDeleteAccount}
       voiceService={voiceService}
       wakeLockService={wakeLockService}
     />

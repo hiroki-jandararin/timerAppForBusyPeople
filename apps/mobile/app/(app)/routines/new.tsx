@@ -1,6 +1,7 @@
 import RoutineForm from '@/components/RoutineForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { consumePendingAiRoutine } from '@/features/ai/aiRoutineStore';
+import { generateAiRoutine } from '@/features/ai/aiRoutineService';
 import { emitRoutineChanged } from '@/features/routines/routineEvents';
 import { routineApiClient, type CreateRoutineInput } from '@timeapp/api-client';
 import { ROUTINE_TEMPLATES, createRoutineFromTemplate } from '@timeapp/core';
@@ -19,10 +20,15 @@ export default function NewRoutineScreen() {
   const template = templateId ? ROUTINE_TEMPLATES.find((t) => t.id === templateId) : undefined;
   const initialValues = pendingAiRoutine ?? (template ? createRoutineFromTemplate(template) : undefined);
 
+  const aiGenerator = token
+    ? (prompt: string, targetDurationSec?: number) => generateAiRoutine(token, prompt, targetDurationSec)
+    : undefined;
+
   return (
     <RoutineForm
       title="ルーティン作成"
       initialValues={initialValues}
+      generateAiRoutine={aiGenerator}
       onSubmit={async (input: CreateRoutineInput) => {
         await api.create(input);
         emitRoutineChanged();

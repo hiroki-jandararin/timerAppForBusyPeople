@@ -1,6 +1,6 @@
 import { Colors } from '@/constants/colors';
 import type { CreateRoutineInput } from '@timeapp/api-client';
-import { addWorkoutSet, addPairedWorkoutSet, buildGroups, type Routine, type RoutineItem } from '@timeapp/core';
+import { addWorkoutSet, addPairedWorkoutSet, buildGroups, MUSCLE_GROUPS, type Routine, type RoutineItem } from '@timeapp/core';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -102,6 +102,8 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
   const [setCount, setSetCount] = useState('3');
   const [workoutSec, setWorkoutSec] = useState('60');
   const [intervalSec, setIntervalSec] = useState('90');
+  const [isExercisePickerOpen, setIsExercisePickerOpen] = useState(false);
+  const [pickerReps, setPickerReps] = useState('');
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
   const [aiParts, setAiParts] = useState<string[]>([]);
   const [aiMinutes, setAiMinutes] = useState<number | null>(null);
@@ -497,9 +499,74 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
               </View>
             )}
 
+            <Pressable
+              style={styles.addItemBtn}
+              onPress={() => {
+                setIsExercisePickerOpen((v) => !v);
+                setIsAiPanelOpen(false);
+              }}
+            >
+              <Text style={styles.addItemText}>種目から追加</Text>
+            </Pressable>
+
+            {isExercisePickerOpen && (
+              <View style={styles.aiPanel}>
+                <TextInput
+                  style={[styles.input, { marginBottom: 8 }]}
+                  placeholder="回数"
+                  placeholderTextColor={Colors.textMuted}
+                  value={pickerReps}
+                  onChangeText={setPickerReps}
+                  keyboardType="numeric"
+                  returnKeyType="done"
+                />
+                <Pressable
+                  style={styles.addItemBtn}
+                  onPress={() => {
+                    setItems((prev) => [...prev, emptyItem()]);
+                    setIsExercisePickerOpen(false);
+                  }}
+                >
+                  <Text style={styles.addItemText}>空白で追加</Text>
+                </Pressable>
+                {MUSCLE_GROUPS.map((group) => (
+                  <View key={group.id}>
+                    <Text style={styles.aiPanelHeading}>{group.label}</Text>
+                    <View style={styles.aiTagRow}>
+                      {group.exercises.map((exercise) => (
+                        <Pressable
+                          key={exercise.id}
+                          style={styles.aiTag}
+                          onPress={() => {
+                            const reps = parseInt(pickerReps, 10);
+                            const title = reps > 0
+                              ? `${exercise.name} ${reps}回`
+                              : exercise.name;
+                            setItems((prev) => [
+                              ...prev,
+                              { id: genId(), type: 'workout', title, durationSec: 30, voiceText: '' },
+                            ]);
+                            setIsExercisePickerOpen(false);
+                          }}
+                        >
+                          <Text style={styles.aiTagText}>{exercise.name}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
             {generateAiRoutine && (
               <>
-                <Pressable style={styles.addItemBtn} onPress={() => setIsAiPanelOpen((v) => !v)}>
+                <Pressable
+                  style={styles.addItemBtn}
+                  onPress={() => {
+                    setIsAiPanelOpen((v) => !v);
+                    setIsExercisePickerOpen(false);
+                  }}
+                >
                   <Text style={styles.addItemText}>AI で追加</Text>
                 </Pressable>
 

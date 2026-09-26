@@ -6,4 +6,6 @@ export class MockVoiceService implements VoiceService {
   speak(text: string): void {
     this.spoken.push(text);
   }
+
+  stop(): void {}
 }
