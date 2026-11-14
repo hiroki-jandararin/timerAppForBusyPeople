@@ -129,6 +129,32 @@ export function duplicateItem(routine: Routine, itemId: string): Routine {
   };
 }
 
+export function duplicateItems(routine: Routine, itemIds: string[]): Routine {
+  const selected = new Set(itemIds);
+  const sources = routine.items.filter((item) => selected.has(item.id));
+  if (sources.length === 0) return routine;
+
+  // コピー側は元と別グループにする（同じ groupId だと元との間が1セットに結合されるため）
+  const newGroupIds = new Map<string, string>();
+  const copies = sources.map((item) => {
+    const copy = cloneRoutineItem(item);
+    if (item.groupId) {
+      if (!newGroupIds.has(item.groupId)) newGroupIds.set(item.groupId, `group_${generateId()}`);
+      copy.groupId = newGroupIds.get(item.groupId);
+    }
+    return copy;
+  });
+
+  const lastIndex = routine.items.reduce((last, item, i) => (selected.has(item.id) ? i : last), -1);
+  const items = [...routine.items];
+  items.splice(lastIndex + 1, 0, ...copies);
+  return {
+    ...routine,
+    items,
+    updatedAt: nowIso(),
+  };
+}
+
 export function moveItemUp(routine: Routine, itemId: string): Routine {
   const index = routine.items.findIndex((item) => item.id === itemId);
   if (index <= 0) return routine;

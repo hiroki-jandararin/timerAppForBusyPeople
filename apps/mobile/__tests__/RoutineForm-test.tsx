@@ -462,3 +462,84 @@ describe('RoutineForm — インターバル単体追加', () => {
     expect(screen.getByText('インターバル')).toBeTruthy();
   });
 });
+
+const threeItemRoutine = {
+  id: 'r3',
+  name: '複数選択テスト',
+  items: [
+    { id: 'm1', type: 'workout' as const, title: 'スクワット', durationSec: 30, voiceText: '' },
+    { id: 'm2', type: 'workout' as const, title: 'プッシュアップ', durationSec: 20, voiceText: '' },
+    { id: 'm3', type: 'workout' as const, title: '腹筋', durationSec: 40, voiceText: '' },
+  ],
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+};
+
+describe('RoutineForm — 複数選択コピー', () => {
+  const enterSelectMode = () => fireEvent.press(screen.getByText('選択'));
+
+  it('初期状態ではコピー用のボタンは表示されない', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    expect(screen.queryByText(/^コピー/)).toBeNull();
+    expect(screen.queryByText('キャンセル')).toBeNull();
+  });
+
+  it('「選択」を押すと選択モードになり、「キャンセル」が表示される', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    expect(screen.getByText('キャンセル')).toBeTruthy();
+    expect(screen.getByText('コピー (0)')).toBeTruthy();
+  });
+
+  it('選択モード中にカードをタップすると展開せず選択される', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    fireEvent.press(screen.getByText('スクワット'));
+    expect(screen.queryAllByPlaceholderText('アイテム名').length).toBe(0);
+    expect(screen.getByText('コピー (1)')).toBeTruthy();
+  });
+
+  it('選択済みカードを再タップすると選択解除される', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    fireEvent.press(screen.getByText('スクワット'));
+    fireEvent.press(screen.getByText('スクワット'));
+    expect(screen.getByText('コピー (0)')).toBeTruthy();
+  });
+
+  it('選択数が0のときコピーを押しても何も増えない', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    fireEvent.press(screen.getByText('コピー (0)'));
+    expect(screen.getAllByTestId('drag-handle').length).toBe(3);
+  });
+
+  it('複数選択してコピーすると、選択範囲の最後の直後に同じ順序で挿入される', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    fireEvent.press(screen.getByText('プッシュアップ'));
+    fireEvent.press(screen.getByText('スクワット'));
+    fireEvent.press(screen.getByText('コピー (2)'));
+    // スクワット, プッシュアップ, スクワット(コピー), プッシュアップ(コピー), 腹筋
+    const titles = screen.getAllByTestId('item-title').map((n) => n.props.children);
+    expect(titles).toEqual(['スクワット', 'プッシュアップ', 'スクワット', 'プッシュアップ', '腹筋']);
+  });
+
+  it('コピー後は選択モードが終了する', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    fireEvent.press(screen.getByText('腹筋'));
+    fireEvent.press(screen.getByText('コピー (1)'));
+    expect(screen.queryByText('キャンセル')).toBeNull();
+    expect(screen.getByText('選択')).toBeTruthy();
+  });
+
+  it('「キャンセル」で選択モードを終了し、アイテムは増えない', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    fireEvent.press(screen.getByText('腹筋'));
+    fireEvent.press(screen.getByText('キャンセル'));
+    expect(screen.queryByText('キャンセル')).toBeNull();
+    expect(screen.getAllByTestId('drag-handle').length).toBe(3);
+  });
+});

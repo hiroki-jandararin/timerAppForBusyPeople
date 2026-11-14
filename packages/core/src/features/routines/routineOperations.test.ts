@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getBaseTitle, getExerciseGroupRange, moveGroup, addWorkoutSet, addItem, addPairedWorkoutSet, buildGroups, assignGroupIds, createRestShorteningPlan } from './routineOperations';
+import { getBaseTitle, getExerciseGroupRange, moveGroup, addWorkoutSet, addItem, addPairedWorkoutSet, buildGroups, assignGroupIds, createRestShorteningPlan, duplicateItems } from './routineOperations';
 import { createRoutine } from './routineFactory';
 import type { Routine } from './routineTypes';
 
@@ -583,5 +583,66 @@ describe('createRestShorteningPlan', () => {
     plan.routine.items
       .filter((it: { type: string }) => it.type === 'interval')
       .forEach((it: { durationSec: number }) => expect(it.durationSec).toBeGreaterThanOrEqual(15));
+  });
+});
+
+// ─── duplicateItems ───────────────────────────────────────────────────────────
+
+describe('duplicateItems', () => {
+  it('選択アイテムを元の順序のまま、選択範囲の最後の直後に挿入する', () => {
+    const routine = makeRoutine([
+      { type: 'workout', title: 'A' },
+      { type: 'workout', title: 'B' },
+      { type: 'workout', title: 'C' },
+      { type: 'workout', title: 'D' },
+    ]);
+    // 選択順に関わらず元の並び順で複製される
+    const result = duplicateItems(routine, ['item-2', 'item-0']);
+    expect(result.items.map((i) => i.title)).toEqual(['A', 'B', 'C', 'A', 'C', 'D']);
+  });
+
+  it('複製されたアイテムは新しいIDを持ち、元のIDは変わらない', () => {
+    const routine = makeRoutine([
+      { type: 'workout', title: 'A', durationSec: 45 },
+      { type: 'interval', title: '休憩', durationSec: 10 },
+    ]);
+    const result = duplicateItems(routine, ['item-0', 'item-1']);
+    expect(result.items).toHaveLength(4);
+    expect(result.items.slice(0, 2).map((i) => i.id)).toEqual(['item-0', 'item-1']);
+    const copies = result.items.slice(2);
+    expect(copies.every((c) => c.id !== 'item-0' && c.id !== 'item-1')).toBe(true);
+    expect(new Set(result.items.map((i) => i.id)).size).toBe(4);
+    expect(copies.map((c) => [c.type, c.title, c.durationSec])).toEqual([
+      ['workout', 'A', 45],
+      ['interval', '休憩', 10],
+    ]);
+  });
+
+  it('同じgroupIdのアイテムは、コピー側で新しい共通groupIdに付け替える', () => {
+    const routine = makeRoutine([
+      { type: 'workout', title: 'A', groupId: 'g1' },
+      { type: 'interval', title: '休憩', groupId: 'g1' },
+      { type: 'workout', title: 'B', groupId: 'g2' },
+    ]);
+    const result = duplicateItems(routine, ['item-0', 'item-1']);
+    const [copyA, copyRest] = result.items.slice(2, 4);
+    expect(copyA.groupId).toBeDefined();
+    expect(copyA.groupId).not.toBe('g1');
+    expect(copyRest.groupId).toBe(copyA.groupId);
+    // 元アイテムのgroupIdは変わらない
+    expect(result.items[0].groupId).toBe('g1');
+    expect(result.items[1].groupId).toBe('g1');
+  });
+
+  it('groupIdを持たないアイテムはgroupIdなしのまま複製する', () => {
+    const routine = makeRoutine([{ type: 'workout', title: 'A' }]);
+    const result = duplicateItems(routine, ['item-0']);
+    expect(result.items[1].groupId).toBeUndefined();
+  });
+
+  it('存在しないIDのみ・空の選択では何も変更しない', () => {
+    const routine = makeRoutine([{ type: 'workout', title: 'A' }]);
+    expect(duplicateItems(routine, [])).toBe(routine);
+    expect(duplicateItems(routine, ['unknown'])).toBe(routine);
   });
 });
