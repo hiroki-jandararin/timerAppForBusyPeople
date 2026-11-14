@@ -42,8 +42,12 @@ function emptyInterval(): RoutineItem {
   return { id: genId(), type: 'interval', title: '', durationSec: 30, voiceText: '' };
 }
 
+// 60秒未満は「N秒」、割り切れるときは「N分」、それ以外は「N分M秒」
 function fmtDuration(sec: number): string {
-  return sec < 60 ? `${sec}秒` : `${sec / 60}分`;
+  if (sec < 60) return `${sec}秒`;
+  const minutes = Math.floor(sec / 60);
+  const rest = sec % 60;
+  return rest === 0 ? `${minutes}分` : `${minutes}分${rest}秒`;
 }
 
 function TotalDurationBar({ items, targetDurationSec }: { items: RoutineItem[]; targetDurationSec: number | null }) {
@@ -244,7 +248,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
     const index = items.findIndex((i) => i.id === item.id);
     const isExpanded = expandedItemIds.has(item.id);
     const isSelected = selectedItemIds.has(item.id);
-    const durationLabel = item.durationSec < 60 ? `${item.durationSec}秒` : `${item.durationSec / 60}分`;
+    const durationLabel = fmtDuration(item.durationSec);
     const renderDeleteAction = (progress: Animated.AnimatedInterpolation<number>) => {
       const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1], extrapolate: 'clamp' });
       return (
@@ -336,7 +340,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
                         item.durationSec === sec && styles.presetTextActive,
                       ]}
                     >
-                      {sec < 60 ? `${sec}秒` : `${sec / 60}分`}
+                      {fmtDuration(sec)}
                     </Text>
                   </Pressable>
                 ))}
@@ -361,7 +365,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
     const groupItems = items.slice(group.itemStart, group.itemEnd + 1);
     const workouts = groupItems.filter((i) => i.type === 'workout');
     const totalSec = group.totalSec;
-    const totalLabel = totalSec < 60 ? `${totalSec}秒` : `${Math.floor(totalSec / 60)}分${totalSec % 60 > 0 ? `${totalSec % 60}秒` : ''}`;
+    const totalLabel = fmtDuration(totalSec);
 
     return (
       <View style={styles.setGroupCard}>
@@ -385,7 +389,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
         <View style={styles.setGroupItems}>
           {workouts.map((w, i) => (
             <Text key={w.id} style={styles.setGroupItemText}>
-              {i + 1}. {w.title}　{w.durationSec < 60 ? `${w.durationSec}秒` : `${w.durationSec / 60}分`}
+              {i + 1}. {w.title}　{fmtDuration(w.durationSec)}
             </Text>
           ))}
         </View>

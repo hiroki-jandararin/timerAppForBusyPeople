@@ -596,3 +596,55 @@ describe('RoutineForm — 未保存の変更の通知 (onDirtyChange)', () => {
     resolveSubmit();
   });
 });
+
+describe('RoutineForm — 時間の表示（分・秒）', () => {
+  const routineOf = (...secs: number[]) => ({
+    id: 'rt',
+    name: '合計時間テスト',
+    items: secs.map((durationSec, i) => ({
+      id: `t${i}`, type: 'workout' as const, title: `種目${i}`, durationSec, voiceText: '',
+    })),
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+  });
+  const show = (...secs: number[]) =>
+    render(<RoutineForm title="編集" initialValues={routineOf(...secs)} onSubmit={jest.fn()} />);
+
+  it('合計が60秒未満のときは秒で表示する', () => {
+    show(25, 25);
+    expect(screen.getByText('50秒')).toBeTruthy();
+  });
+
+  it('合計が分で割り切れるときは「N分」と表示する', () => {
+    show(60, 60);
+    expect(screen.getByText('2分')).toBeTruthy();
+  });
+
+  it('合計が分で割り切れないときは「N分M秒」と表示する', () => {
+    show(50, 40); // 90秒
+    expect(screen.getByText('1分30秒')).toBeTruthy();
+  });
+
+  it('合計が分で割り切れないときも四捨五入せず正確に表示する', () => {
+    show(100, 20, 15); // 135秒
+    expect(screen.getByText('2分15秒')).toBeTruthy();
+  });
+
+  it('小数の「分」表示にはならない', () => {
+    show(50, 40);
+    expect(screen.queryByText(/\./)).toBeNull();
+  });
+
+  it('個別アイテムのバッジも「N分M秒」で表示する', () => {
+    show(90);
+    // 合計とバッジの両方が 1分30秒
+    expect(screen.getAllByText('1分30秒').length).toBe(2);
+  });
+
+  it('プリセットの90秒ボタンは「1分30秒」と表示する', () => {
+    show(30);
+    fireEvent.press(screen.getByText('種目0'));
+    expect(screen.getByText('1分30秒')).toBeTruthy();
+    expect(screen.queryByText('1.5分')).toBeNull();
+  });
+});
