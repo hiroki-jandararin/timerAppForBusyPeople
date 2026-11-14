@@ -467,6 +467,29 @@ export function buildGroups(
   return groups;
 }
 
+/**
+ * セット表示の並べ替え。セット（種目間休憩を含む）と単独アイテムを1ブロックとして、
+ * orderedLeadIds（各ブロック先頭アイテムのID）の順に並べ直す。
+ * ブロックの過不足や未知のIDがある場合は元の配列をそのまま返す。
+ */
+export function reorderSetBlocks(items: RoutineItem[], orderedLeadIds: string[]): RoutineItem[] {
+  const groups = buildGroups(items, -1, false);
+  const blocks = new Map<string, RoutineItem[]>();
+  let i = 0;
+  while (i < items.length) {
+    const group = groups.find((g) => g.itemStart === i);
+    const end = group ? group.itemEnd : i;
+    blocks.set(items[i].id, items.slice(i, end + 1));
+    i = end + 1;
+  }
+
+  const isSameBlockSet =
+    orderedLeadIds.length === blocks.size && orderedLeadIds.every((id) => blocks.has(id));
+  if (!isSameBlockSet || new Set(orderedLeadIds).size !== blocks.size) return items;
+
+  return orderedLeadIds.flatMap((id) => blocks.get(id) ?? []);
+}
+
 // ─── assignGroupIds ───────────────────────────────────────────────────────────
 
 function toGroupBase(title: string): string {

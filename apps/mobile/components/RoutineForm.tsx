@@ -1,6 +1,6 @@
 import { Colors } from '@/constants/colors';
 import type { CreateRoutineInput } from '@timeapp/api-client';
-import { addWorkoutSet, addPairedWorkoutSet, buildGroups, duplicateItems as duplicateItemsInRoutine, MUSCLE_GROUPS, type Routine, type RoutineItem } from '@timeapp/core';
+import { addWorkoutSet, addPairedWorkoutSet, buildGroups, duplicateItems as duplicateItemsInRoutine, reorderSetBlocks, MUSCLE_GROUPS, type Routine, type RoutineItem } from '@timeapp/core';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -359,7 +359,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
   const exerciseGroups = buildGroups(items, -1, false);
   const groupedItemIndices = new Set(exerciseGroups.flatMap((g) => Array.from({ length: g.itemEnd - g.itemStart + 1 }, (_, i) => g.itemStart + i)));
 
-  const renderSetGroup = (startIdx: number) => {
+  const renderSetGroup = (startIdx: number, drag: () => void, isActive: boolean) => {
     const group = exerciseGroups.find((g) => g.itemStart === startIdx);
     if (!group) return null;
     const groupItems = items.slice(group.itemStart, group.itemEnd + 1);
@@ -368,7 +368,12 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
     const totalLabel = fmtDuration(totalSec);
 
     return (
-      <View style={styles.setGroupCard}>
+      <Pressable
+        testID="set-group-card"
+        style={[styles.setGroupCard, isActive && { opacity: 0.9 }]}
+        onLongPress={drag}
+        delayLongPress={150}
+      >
         <View style={styles.setGroupHeader}>
           <View style={styles.setGroupLeft}>
             <View style={[styles.typeDot, { backgroundColor: Colors.orange }]} />
@@ -393,7 +398,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
             </Text>
           ))}
         </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -409,7 +414,11 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
         }
         keyExtractor={(item) => item.id}
         onDragEnd={({ data }) => {
-          if (viewMode === 'set') return;
+          if (viewMode === 'set') {
+            // セット表示の data は各ブロック（セット/単独アイテム）の先頭アイテム。ブロック単位で並べ替える
+            setItems((prev) => reorderSetBlocks(prev, data.map((d) => d.id)));
+            return;
+          }
           setItems(data);
         }}
         renderItem={(params) => {
@@ -419,7 +428,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
             if (group) {
               return (
                 <ScaleDecorator key={params.item.id}>
-                  {renderSetGroup(idx)}
+                  {renderSetGroup(idx, params.drag, params.isActive)}
                 </ScaleDecorator>
               );
             }

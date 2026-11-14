@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import RoutineForm from '../components/RoutineForm';
 
 jest.mock('@/contexts/AuthContext', () => ({
@@ -646,5 +646,58 @@ describe('RoutineForm — 時間の表示（分・秒）', () => {
     fireEvent.press(screen.getByText('種目0'));
     expect(screen.getByText('1分30秒')).toBeTruthy();
     expect(screen.queryByText('1.5分')).toBeNull();
+  });
+});
+
+describe('RoutineForm — セット表示でのドラッグ&ドロップ並び替え', () => {
+  // セットA（スクワット 1 / 休憩 / スクワット 2）+ 単独のプッシュアップ
+  const mixedRoutine = {
+    id: 'rm',
+    name: 'セット並び替え',
+    items: [
+      { id: 'a1', type: 'workout' as const, title: 'スクワット 1', durationSec: 60, voiceText: '', groupId: 'gA' },
+      { id: 'a2', type: 'interval' as const, title: '休憩', durationSec: 30, voiceText: '', groupId: 'gA' },
+      { id: 'a3', type: 'workout' as const, title: 'スクワット 2', durationSec: 60, voiceText: '', groupId: 'gA' },
+      { id: 'p1', type: 'workout' as const, title: 'プッシュアップ', durationSec: 30, voiceText: '' },
+    ],
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+  };
+  const mockDrag = () => (globalThis as any).__mockDrag as jest.Mock;
+  const dragEnd = (ids: string[], source = mixedRoutine.items) =>
+    act(() => {
+      (globalThis as any).__mockOnDragEnd({ data: ids.map((id) => source.find((i) => i.id === id)) });
+    });
+  const allTitles = () => screen.getAllByTestId('item-title').map((n) => n.props.children);
+
+  beforeEach(() => mockDrag().mockClear());
+
+  it('セット表示で、セットカードを長押しするとドラッグが開始される', () => {
+    render(<RoutineForm title="編集" initialValues={mixedRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('セット'));
+    fireEvent(screen.getAllByTestId('set-group-card')[0], 'longPress');
+    expect(mockDrag()).toHaveBeenCalledTimes(1);
+  });
+
+  it('セット表示でセットを並べ替えると、セット内のアイテムごと移動する', () => {
+    render(<RoutineForm title="編集" initialValues={mixedRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('セット'));
+    dragEnd(['p1', 'a1']); // プッシュアップをセットAの前へ
+    fireEvent.press(screen.getByText('全表示'));
+    expect(allTitles()).toEqual(['プッシュアップ', 'スクワット 1', '休憩', 'スクワット 2']);
+  });
+
+  it('セット表示での並べ替えは未保存の変更として通知される', () => {
+    const onDirtyChange = jest.fn();
+    render(<RoutineForm title="編集" initialValues={mixedRoutine} onSubmit={jest.fn()} onDirtyChange={onDirtyChange} />);
+    fireEvent.press(screen.getByText('セット'));
+    dragEnd(['p1', 'a1']);
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it('全表示でのドラッグ並び替えは従来どおりアイテム単位で動く', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    dragEnd(['i2', 'i1'], twoItemRoutine.items as never);
+    expect(allTitles()).toEqual(['プッシュアップ', 'スクワット']);
   });
 });
