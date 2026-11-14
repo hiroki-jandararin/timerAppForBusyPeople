@@ -1,3 +1,8 @@
+import { configure } from '@testing-library/react-native';
+
+// CI（低スペック・全スイート並列）では初回描画が遅れ、findBy* の既定1秒でタイムアウトすることがあるため延長する
+configure({ asyncUtilTimeout: 5000 });
+
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 
 jest.mock('react-native-gesture-handler', () => {
