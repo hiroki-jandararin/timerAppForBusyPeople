@@ -5,6 +5,10 @@ const mockGetById = jest.fn();
 const mockBack = jest.fn();
 const mockSignOut = jest.fn();
 
+jest.mock('@/features/routines/useUnsavedChangesGuard', () => ({
+  useUnsavedChangesGuard: jest.fn(),
+}));
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack }),
   useLocalSearchParams: () => ({ id: 'routine-1' }),

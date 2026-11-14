@@ -5,6 +5,10 @@ import NewRoutineScreen from '../app/(app)/routines/new';
 
 const mockDismissAll = jest.fn();
 const mockCreate = jest.fn().mockResolvedValue({});
+jest.mock('@/features/routines/useUnsavedChangesGuard', () => ({
+  useUnsavedChangesGuard: jest.fn(),
+}));
+
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(),
   useLocalSearchParams: jest.fn(),

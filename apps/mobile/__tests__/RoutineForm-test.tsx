@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import RoutineForm from '../components/RoutineForm';
 
 jest.mock('@/contexts/AuthContext', () => ({
@@ -541,5 +541,58 @@ describe('RoutineForm — 複数選択コピー', () => {
     fireEvent.press(screen.getByText('キャンセル'));
     expect(screen.queryByText('キャンセル')).toBeNull();
     expect(screen.getAllByTestId('drag-handle').length).toBe(3);
+  });
+});
+
+describe('RoutineForm — 未保存の変更の通知 (onDirtyChange)', () => {
+  const lastDirty = (fn: jest.Mock) => fn.mock.calls[fn.mock.calls.length - 1]?.[0];
+
+  it('初期状態では変更なし(false)', () => {
+    const onDirtyChange = jest.fn();
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} onDirtyChange={onDirtyChange} />);
+    expect(lastDirty(onDirtyChange)).toBe(false);
+  });
+
+  it('ルーティン名を変更すると変更あり(true)になる', () => {
+    const onDirtyChange = jest.fn();
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} onDirtyChange={onDirtyChange} />);
+    fireEvent.changeText(screen.getByPlaceholderText('例: 朝トレ10分'), '変更後');
+    expect(lastDirty(onDirtyChange)).toBe(true);
+  });
+
+  it('元の値に戻すと変更なし(false)に戻る', () => {
+    const onDirtyChange = jest.fn();
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} onDirtyChange={onDirtyChange} />);
+    const input = screen.getByPlaceholderText('例: 朝トレ10分');
+    fireEvent.changeText(input, '変更後');
+    fireEvent.changeText(input, 'テスト');
+    expect(lastDirty(onDirtyChange)).toBe(false);
+  });
+
+  it('アイテムを追加すると変更あり(true)になる', () => {
+    const onDirtyChange = jest.fn();
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} onDirtyChange={onDirtyChange} />);
+    fireEvent.press(screen.getByText('＋ アイテムを追加'));
+    expect(lastDirty(onDirtyChange)).toBe(true);
+  });
+
+  it('アイテムを展開しただけでは変更扱いにならない', () => {
+    const onDirtyChange = jest.fn();
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} onDirtyChange={onDirtyChange} />);
+    fireEvent.press(screen.getByText('スクワット'));
+    expect(lastDirty(onDirtyChange)).toBe(false);
+  });
+
+  it('保存処理中は変更なし(false)として通知する（保存後の画面遷移を警告で止めないため）', async () => {
+    const onDirtyChange = jest.fn();
+    let resolveSubmit: () => void = () => {};
+    const onSubmit = jest.fn(() => new Promise<void>((r) => { resolveSubmit = r; }));
+    render(<RoutineForm title="編集" initialValues={{ ...twoItemRoutine, targetDurationSec: 600 }} onSubmit={onSubmit} onDirtyChange={onDirtyChange} />);
+    fireEvent.changeText(screen.getByPlaceholderText('例: 朝トレ10分'), '変更後');
+    expect(lastDirty(onDirtyChange)).toBe(true);
+    fireEvent.press(screen.getByText('保存'));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(lastDirty(onDirtyChange)).toBe(false);
+    resolveSubmit();
   });
 });

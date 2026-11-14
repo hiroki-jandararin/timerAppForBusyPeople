@@ -1,7 +1,7 @@
 import { Colors } from '@/constants/colors';
 import type { CreateRoutineInput } from '@timeapp/api-client';
 import { addWorkoutSet, addPairedWorkoutSet, buildGroups, duplicateItems as duplicateItemsInRoutine, MUSCLE_GROUPS, type Routine, type RoutineItem } from '@timeapp/core';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -22,6 +22,8 @@ type Props = {
   initialValues?: Routine;
   onSubmit: (input: CreateRoutineInput) => Promise<void>;
   generateAiRoutine?: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
+  /** 未保存の変更の有無が変わったときに通知する（保存処理中は false） */
+  onDirtyChange?: (isDirty: boolean) => void;
 };
 
 const DURATION_PRESETS = [15, 20, 30, 45, 60, 90, 120];
@@ -73,7 +75,7 @@ function TotalDurationBar({ items, targetDurationSec }: { items: RoutineItem[]; 
   );
 }
 
-export default function RoutineForm({ title, initialValues, onSubmit, generateAiRoutine }: Props) {
+export default function RoutineForm({ title, initialValues, onSubmit, generateAiRoutine, onDirtyChange }: Props) {
   const [name, setName] = useState(initialValues?.name ?? '');
   const [items, setItems] = useState<RoutineItem[]>(
     initialValues?.items.length ? initialValues.items : [emptyItem()],
@@ -81,6 +83,8 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
   const [targetDurationText, setTargetDurationText] = useState(
     initialValues?.targetDurationSec ? String(Math.floor(initialValues.targetDurationSec / 60)) : ''
   );
+  const snapshot = JSON.stringify({ name, items, targetDurationText });
+  const initialSnapshot = useRef(snapshot);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
@@ -203,6 +207,11 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
     const m = parseInt(targetDurationText, 10);
     return !isNaN(m) && m > 0 ? m * 60 : null;
   })();
+
+  const isDirty = snapshot !== initialSnapshot.current && !saving;
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const handleSave = async () => {
     if (!name.trim()) {
