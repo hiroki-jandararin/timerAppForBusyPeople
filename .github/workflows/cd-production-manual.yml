@@ -103,7 +103,7 @@ jobs:
       - name: 本番デプロイ
         id: deploy
         run: |
-          url=$(npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | tail -1)
+          url=$(npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} | tail -1)
           echo "production_url=$url" >> $GITHUB_OUTPUT
         working-directory: apps/web
       - name: デプロイ URL を表示
