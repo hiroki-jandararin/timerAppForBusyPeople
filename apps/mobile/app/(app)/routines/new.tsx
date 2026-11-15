@@ -3,15 +3,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import { consumePendingAiRoutine } from '@/features/ai/aiRoutineStore';
 import { generateAiRoutine } from '@/features/ai/aiRoutineService';
 import { emitRoutineChanged } from '@/features/routines/routineEvents';
+import { useUnsavedChangesGuard } from '@/features/routines/useUnsavedChangesGuard';
 import { routineApiClient, type CreateRoutineInput } from '@timeapp/api-client';
 import { ROUTINE_TEMPLATES, createRoutineFromTemplate } from '@timeapp/core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
 
 export default function NewRoutineScreen() {
   const { token } = useAuth();
   const router = useRouter();
+  const [isDirty, setIsDirty] = useState(false);
+  useUnsavedChangesGuard(isDirty);
   const { templateId } = useLocalSearchParams<{ templateId?: string }>();
 
   const api = routineApiClient({ baseUrl: API_BASE_URL, getToken: () => token });
@@ -27,6 +31,7 @@ export default function NewRoutineScreen() {
   return (
     <RoutineForm
       title="ルーティン作成"
+      onDirtyChange={setIsDirty}
       initialValues={initialValues}
       generateAiRoutine={aiGenerator}
       onSubmit={async (input: CreateRoutineInput) => {

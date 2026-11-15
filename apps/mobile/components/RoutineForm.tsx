@@ -1,7 +1,7 @@
 import { Colors } from '@/constants/colors';
 import type { CreateRoutineInput } from '@timeapp/api-client';
-import { addWorkoutSet, addPairedWorkoutSet, buildGroups, MUSCLE_GROUPS, type Routine, type RoutineItem } from '@timeapp/core';
-import { useState } from 'react';
+import { addWorkoutSet, addPairedWorkoutSet, buildGroups, duplicateItems as duplicateItemsInRoutine, reorderSetBlocks, MUSCLE_GROUPS, type Routine, type RoutineItem } from '@timeapp/core';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -22,6 +22,8 @@ type Props = {
   initialValues?: Routine;
   onSubmit: (input: CreateRoutineInput) => Promise<void>;
   generateAiRoutine?: (prompt: string, targetDurationSec?: number) => Promise<Routine>;
+  /** 未保存の変更の有無が変わったときに通知する（保存処理中は false） */
+  onDirtyChange?: (isDirty: boolean) => void;
 };
 
 const DURATION_PRESETS = [15, 20, 30, 45, 60, 90, 120];
@@ -40,8 +42,12 @@ function emptyInterval(): RoutineItem {
   return { id: genId(), type: 'interval', title: '', durationSec: 30, voiceText: '' };
 }
 
+// 60秒未満は「N秒」、割り切れるときは「N分」、それ以外は「N分M秒」
 function fmtDuration(sec: number): string {
-  return sec < 60 ? `${sec}秒` : `${sec / 60}分`;
+  if (sec < 60) return `${sec}秒`;
+  const minutes = Math.floor(sec / 60);
+  const rest = sec % 60;
+  return rest === 0 ? `${minutes}分` : `${minutes}分${rest}秒`;
 }
 
 function TotalDurationBar({ items, targetDurationSec }: { items: RoutineItem[]; targetDurationSec: number | null }) {
@@ -73,7 +79,7 @@ function TotalDurationBar({ items, targetDurationSec }: { items: RoutineItem[]; 
   );
 }
 
-export default function RoutineForm({ title, initialValues, onSubmit, generateAiRoutine }: Props) {
+export default function RoutineForm({ title, initialValues, onSubmit, generateAiRoutine, onDirtyChange }: Props) {
   const [name, setName] = useState(initialValues?.name ?? '');
   const [items, setItems] = useState<RoutineItem[]>(
     initialValues?.items.length ? initialValues.items : [emptyItem()],
@@ -81,6 +87,10 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
   const [targetDurationText, setTargetDurationText] = useState(
     initialValues?.targetDurationSec ? String(Math.floor(initialValues.targetDurationSec / 60)) : ''
   );
+  const snapshot = JSON.stringify({ name, items, targetDurationText });
+  const initialSnapshot = useRef(snapshot);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'set'>('all');
@@ -170,10 +180,42 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
     });
   };
 
+  const startSelectMode = () => {
+    setViewMode('all');
+    setSelectedItemIds(new Set());
+    setSelectMode(true);
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedItemIds(new Set());
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const copySelectedItems = () => {
+    if (selectedItemIds.size === 0) return;
+    const draftRoutine = { id: '', name, items, createdAt: '', updatedAt: '' };
+    const updated = duplicateItemsInRoutine(draftRoutine, Array.from(selectedItemIds));
+    setItems(updated.items);
+    exitSelectMode();
+  };
+
   const targetDurationSec = (() => {
     const m = parseInt(targetDurationText, 10);
     return !isNaN(m) && m > 0 ? m * 60 : null;
   })();
+
+  const isDirty = snapshot !== initialSnapshot.current && !saving;
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -205,7 +247,8 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
   const renderItem = ({ item, drag, isActive }: RenderItemParams<RoutineItem>) => {
     const index = items.findIndex((i) => i.id === item.id);
     const isExpanded = expandedItemIds.has(item.id);
-    const durationLabel = item.durationSec < 60 ? `${item.durationSec}秒` : `${item.durationSec / 60}分`;
+    const isSelected = selectedItemIds.has(item.id);
+    const durationLabel = fmtDuration(item.durationSec);
     const renderDeleteAction = (progress: Animated.AnimatedInterpolation<number>) => {
       const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1], extrapolate: 'clamp' });
       return (
@@ -217,15 +260,25 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
 
     return (
       <ScaleDecorator>
-        <Swipeable renderRightActions={renderDeleteAction} friction={2} rightThreshold={60}>
-          <View style={[styles.itemCard, isActive && { opacity: 0.9 }]}>
+        <Swipeable renderRightActions={renderDeleteAction} friction={2} rightThreshold={60} enabled={!selectMode}>
+          <View style={[styles.itemCard, isActive && { opacity: 0.9 }, isSelected && styles.itemCardSelected]}>
             <View style={styles.itemHeader}>
-              <Pressable style={styles.itemSummary} onPress={() => toggleExpand(item.id)} onLongPress={drag} delayLongPress={150}>
+              <Pressable
+                style={styles.itemSummary}
+                onPress={() => (selectMode ? toggleSelect(item.id) : toggleExpand(item.id))}
+                onLongPress={selectMode ? undefined : drag}
+                delayLongPress={150}
+              >
+                {selectMode && (
+                  <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
+                    {isSelected && <Text style={styles.checkboxMark}>✓</Text>}
+                  </View>
+                )}
                 <View style={[
                   styles.typeDot,
                   { backgroundColor: item.type === 'workout' ? Colors.orange : Colors.green },
                 ]} />
-                <Text style={styles.itemSummaryTitle} numberOfLines={1}>
+                <Text testID="item-title" style={styles.itemSummaryTitle} numberOfLines={1}>
                   {item.title || 'アイテム名未設定'}
                 </Text>
                 <View style={styles.durationBadge}>
@@ -235,7 +288,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
               <View testID="drag-handle" />
             </View>
 
-          {isExpanded && (
+          {isExpanded && !selectMode && (
             <>
               <View style={styles.typeToggle}>
                 {(['workout', 'interval'] as const).map((t) => (
@@ -287,7 +340,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
                         item.durationSec === sec && styles.presetTextActive,
                       ]}
                     >
-                      {sec < 60 ? `${sec}秒` : `${sec / 60}分`}
+                      {fmtDuration(sec)}
                     </Text>
                   </Pressable>
                 ))}
@@ -306,16 +359,21 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
   const exerciseGroups = buildGroups(items, -1, false);
   const groupedItemIndices = new Set(exerciseGroups.flatMap((g) => Array.from({ length: g.itemEnd - g.itemStart + 1 }, (_, i) => g.itemStart + i)));
 
-  const renderSetGroup = (startIdx: number) => {
+  const renderSetGroup = (startIdx: number, drag: () => void, isActive: boolean) => {
     const group = exerciseGroups.find((g) => g.itemStart === startIdx);
     if (!group) return null;
     const groupItems = items.slice(group.itemStart, group.itemEnd + 1);
     const workouts = groupItems.filter((i) => i.type === 'workout');
     const totalSec = group.totalSec;
-    const totalLabel = totalSec < 60 ? `${totalSec}秒` : `${Math.floor(totalSec / 60)}分${totalSec % 60 > 0 ? `${totalSec % 60}秒` : ''}`;
+    const totalLabel = fmtDuration(totalSec);
 
     return (
-      <View style={styles.setGroupCard}>
+      <Pressable
+        testID="set-group-card"
+        style={[styles.setGroupCard, isActive && { opacity: 0.9 }]}
+        onLongPress={drag}
+        delayLongPress={150}
+      >
         <View style={styles.setGroupHeader}>
           <View style={styles.setGroupLeft}>
             <View style={[styles.typeDot, { backgroundColor: Colors.orange }]} />
@@ -336,11 +394,11 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
         <View style={styles.setGroupItems}>
           {workouts.map((w, i) => (
             <Text key={w.id} style={styles.setGroupItemText}>
-              {i + 1}. {w.title}　{w.durationSec < 60 ? `${w.durationSec}秒` : `${w.durationSec / 60}分`}
+              {i + 1}. {w.title}　{fmtDuration(w.durationSec)}
             </Text>
           ))}
         </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -356,7 +414,11 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
         }
         keyExtractor={(item) => item.id}
         onDragEnd={({ data }) => {
-          if (viewMode === 'set') return;
+          if (viewMode === 'set') {
+            // セット表示の data は各ブロック（セット/単独アイテム）の先頭アイテム。ブロック単位で並べ替える
+            setItems((prev) => reorderSetBlocks(prev, data.map((d) => d.id)));
+            return;
+          }
           setItems(data);
         }}
         renderItem={(params) => {
@@ -366,7 +428,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
             if (group) {
               return (
                 <ScaleDecorator key={params.item.id}>
-                  {renderSetGroup(idx)}
+                  {renderSetGroup(idx, params.drag, params.isActive)}
                 </ScaleDecorator>
               );
             }
@@ -404,6 +466,23 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
             {itemsError ? <Text style={styles.errorText}>{itemsError}</Text> : null}
             <View style={styles.itemsHeader}>
               <Text style={styles.sectionLabel}>アイテム</Text>
+              {selectMode ? (
+                <View style={styles.selectActions}>
+                  <Pressable
+                    style={[styles.copyBtn, selectedItemIds.size === 0 && { opacity: 0.4 }]}
+                    onPress={copySelectedItems}
+                  >
+                    <Text style={styles.copyBtnText}>コピー ({selectedItemIds.size})</Text>
+                  </Pressable>
+                  <Pressable style={styles.selectBtn} onPress={exitSelectMode}>
+                    <Text style={styles.selectBtnText}>キャンセル</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable style={styles.selectBtn} onPress={startSelectMode}>
+                  <Text style={styles.selectBtnText}>選択</Text>
+                </Pressable>
+              )}
               <View style={styles.viewToggle}>
                 <Pressable
                   style={[styles.viewToggleBtn, viewMode === 'all' && styles.viewToggleBtnActive]}
@@ -413,7 +492,7 @@ export default function RoutineForm({ title, initialValues, onSubmit, generateAi
                 </Pressable>
                 <Pressable
                   style={[styles.viewToggleBtn, viewMode === 'set' && styles.viewToggleBtnActive]}
-                  onPress={() => setViewMode('set')}
+                  onPress={() => { exitSelectMode(); setViewMode('set'); }}
                 >
                   <Text style={[styles.viewToggleText, viewMode === 'set' && styles.viewToggleTextActive]}>セット</Text>
                 </Pressable>
@@ -658,6 +737,30 @@ const styles = StyleSheet.create({
   viewToggleBtnActive: { backgroundColor: Colors.orange },
   viewToggleText: { fontSize: 12, color: Colors.textSub, fontWeight: '600' },
   viewToggleTextActive: { color: Colors.bg },
+  selectActions: { flexDirection: 'row', gap: 6, marginRight: 8 },
+  selectBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginRight: 8,
+  },
+  selectBtnText: { fontSize: 12, color: Colors.textSub, fontWeight: '600' },
+  copyBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: Colors.orange },
+  copyBtnText: { fontSize: 12, color: Colors.bg, fontWeight: '700' },
+  itemCardSelected: { borderColor: Colors.orange },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: { backgroundColor: Colors.orange, borderColor: Colors.orange },
+  checkboxMark: { color: Colors.bg, fontSize: 13, fontWeight: '900' },
   setGroupCard: {
     backgroundColor: Colors.card,
     borderRadius: 14,

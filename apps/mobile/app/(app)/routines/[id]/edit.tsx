@@ -1,6 +1,7 @@
 import RoutineForm from '@/components/RoutineForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { generateAiRoutine } from '@/features/ai/aiRoutineService';
+import { useUnsavedChangesGuard } from '@/features/routines/useUnsavedChangesGuard';
 import { routineApiClient, ApiError, type CreateRoutineInput } from '@timeapp/api-client';
 import type { Routine } from '@timeapp/core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -15,6 +16,8 @@ export default function EditRoutineScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [routine, setRoutine] = useState<Routine | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  useUnsavedChangesGuard(isDirty);
 
   const api = routineApiClient({ baseUrl: API_BASE_URL, getToken: () => token });
 
@@ -40,6 +43,7 @@ export default function EditRoutineScreen() {
   return (
     <RoutineForm
       title="ルーティン編集"
+      onDirtyChange={setIsDirty}
       initialValues={routine}
       generateAiRoutine={aiGenerator}
       onSubmit={async (input: CreateRoutineInput) => {

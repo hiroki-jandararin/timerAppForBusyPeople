@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import RoutineForm from '../components/RoutineForm';
 
 jest.mock('@/contexts/AuthContext', () => ({
@@ -460,5 +460,244 @@ describe('RoutineForm — インターバル単体追加', () => {
     // 最後のカードを開く（アイテム名未設定が追加される）
     fireEvent.press(screen.getByText('アイテム名未設定'));
     expect(screen.getByText('インターバル')).toBeTruthy();
+  });
+});
+
+const threeItemRoutine = {
+  id: 'r3',
+  name: '複数選択テスト',
+  items: [
+    { id: 'm1', type: 'workout' as const, title: 'スクワット', durationSec: 30, voiceText: '' },
+    { id: 'm2', type: 'workout' as const, title: 'プッシュアップ', durationSec: 20, voiceText: '' },
+    { id: 'm3', type: 'workout' as const, title: '腹筋', durationSec: 40, voiceText: '' },
+  ],
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+};
+
+describe('RoutineForm — 複数選択コピー', () => {
+  const enterSelectMode = () => fireEvent.press(screen.getByText('選択'));
+
+  it('初期状態ではコピー用のボタンは表示されない', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    expect(screen.queryByText(/^コピー/)).toBeNull();
+    expect(screen.queryByText('キャンセル')).toBeNull();
+  });
+
+  it('「選択」を押すと選択モードになり、「キャンセル」が表示される', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    expect(screen.getByText('キャンセル')).toBeTruthy();
+    expect(screen.getByText('コピー (0)')).toBeTruthy();
+  });
+
+  it('選択モード中にカードをタップすると展開せず選択される', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    fireEvent.press(screen.getByText('スクワット'));
+    expect(screen.queryAllByPlaceholderText('アイテム名').length).toBe(0);
+    expect(screen.getByText('コピー (1)')).toBeTruthy();
+  });
+
+  it('選択済みカードを再タップすると選択解除される', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    fireEvent.press(screen.getByText('スクワット'));
+    fireEvent.press(screen.getByText('スクワット'));
+    expect(screen.getByText('コピー (0)')).toBeTruthy();
+  });
+
+  it('選択数が0のときコピーを押しても何も増えない', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    fireEvent.press(screen.getByText('コピー (0)'));
+    expect(screen.getAllByTestId('drag-handle').length).toBe(3);
+  });
+
+  it('複数選択してコピーすると、選択範囲の最後の直後に同じ順序で挿入される', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    fireEvent.press(screen.getByText('プッシュアップ'));
+    fireEvent.press(screen.getByText('スクワット'));
+    fireEvent.press(screen.getByText('コピー (2)'));
+    // スクワット, プッシュアップ, スクワット(コピー), プッシュアップ(コピー), 腹筋
+    const titles = screen.getAllByTestId('item-title').map((n) => n.props.children);
+    expect(titles).toEqual(['スクワット', 'プッシュアップ', 'スクワット', 'プッシュアップ', '腹筋']);
+  });
+
+  it('コピー後は選択モードが終了する', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    fireEvent.press(screen.getByText('腹筋'));
+    fireEvent.press(screen.getByText('コピー (1)'));
+    expect(screen.queryByText('キャンセル')).toBeNull();
+    expect(screen.getByText('選択')).toBeTruthy();
+  });
+
+  it('「キャンセル」で選択モードを終了し、アイテムは増えない', () => {
+    render(<RoutineForm title="編集" initialValues={threeItemRoutine} onSubmit={jest.fn()} />);
+    enterSelectMode();
+    fireEvent.press(screen.getByText('腹筋'));
+    fireEvent.press(screen.getByText('キャンセル'));
+    expect(screen.queryByText('キャンセル')).toBeNull();
+    expect(screen.getAllByTestId('drag-handle').length).toBe(3);
+  });
+});
+
+describe('RoutineForm — 未保存の変更の通知 (onDirtyChange)', () => {
+  const lastDirty = (fn: jest.Mock) => fn.mock.calls[fn.mock.calls.length - 1]?.[0];
+
+  it('初期状態では変更なし(false)', () => {
+    const onDirtyChange = jest.fn();
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} onDirtyChange={onDirtyChange} />);
+    expect(lastDirty(onDirtyChange)).toBe(false);
+  });
+
+  it('ルーティン名を変更すると変更あり(true)になる', () => {
+    const onDirtyChange = jest.fn();
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} onDirtyChange={onDirtyChange} />);
+    fireEvent.changeText(screen.getByPlaceholderText('例: 朝トレ10分'), '変更後');
+    expect(lastDirty(onDirtyChange)).toBe(true);
+  });
+
+  it('元の値に戻すと変更なし(false)に戻る', () => {
+    const onDirtyChange = jest.fn();
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} onDirtyChange={onDirtyChange} />);
+    const input = screen.getByPlaceholderText('例: 朝トレ10分');
+    fireEvent.changeText(input, '変更後');
+    fireEvent.changeText(input, 'テスト');
+    expect(lastDirty(onDirtyChange)).toBe(false);
+  });
+
+  it('アイテムを追加すると変更あり(true)になる', () => {
+    const onDirtyChange = jest.fn();
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} onDirtyChange={onDirtyChange} />);
+    fireEvent.press(screen.getByText('＋ アイテムを追加'));
+    expect(lastDirty(onDirtyChange)).toBe(true);
+  });
+
+  it('アイテムを展開しただけでは変更扱いにならない', () => {
+    const onDirtyChange = jest.fn();
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} onDirtyChange={onDirtyChange} />);
+    fireEvent.press(screen.getByText('スクワット'));
+    expect(lastDirty(onDirtyChange)).toBe(false);
+  });
+
+  it('保存処理中は変更なし(false)として通知する（保存後の画面遷移を警告で止めないため）', async () => {
+    const onDirtyChange = jest.fn();
+    let resolveSubmit: () => void = () => {};
+    const onSubmit = jest.fn(() => new Promise<void>((r) => { resolveSubmit = r; }));
+    render(<RoutineForm title="編集" initialValues={{ ...twoItemRoutine, targetDurationSec: 600 }} onSubmit={onSubmit} onDirtyChange={onDirtyChange} />);
+    fireEvent.changeText(screen.getByPlaceholderText('例: 朝トレ10分'), '変更後');
+    expect(lastDirty(onDirtyChange)).toBe(true);
+    fireEvent.press(screen.getByText('保存'));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(lastDirty(onDirtyChange)).toBe(false);
+    resolveSubmit();
+  });
+});
+
+describe('RoutineForm — 時間の表示（分・秒）', () => {
+  const routineOf = (...secs: number[]) => ({
+    id: 'rt',
+    name: '合計時間テスト',
+    items: secs.map((durationSec, i) => ({
+      id: `t${i}`, type: 'workout' as const, title: `種目${i}`, durationSec, voiceText: '',
+    })),
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+  });
+  const show = (...secs: number[]) =>
+    render(<RoutineForm title="編集" initialValues={routineOf(...secs)} onSubmit={jest.fn()} />);
+
+  it('合計が60秒未満のときは秒で表示する', () => {
+    show(25, 25);
+    expect(screen.getByText('50秒')).toBeTruthy();
+  });
+
+  it('合計が分で割り切れるときは「N分」と表示する', () => {
+    show(60, 60);
+    expect(screen.getByText('2分')).toBeTruthy();
+  });
+
+  it('合計が分で割り切れないときは「N分M秒」と表示する', () => {
+    show(50, 40); // 90秒
+    expect(screen.getByText('1分30秒')).toBeTruthy();
+  });
+
+  it('合計が分で割り切れないときも四捨五入せず正確に表示する', () => {
+    show(100, 20, 15); // 135秒
+    expect(screen.getByText('2分15秒')).toBeTruthy();
+  });
+
+  it('小数の「分」表示にはならない', () => {
+    show(50, 40);
+    expect(screen.queryByText(/\./)).toBeNull();
+  });
+
+  it('個別アイテムのバッジも「N分M秒」で表示する', () => {
+    show(90);
+    // 合計とバッジの両方が 1分30秒
+    expect(screen.getAllByText('1分30秒').length).toBe(2);
+  });
+
+  it('プリセットの90秒ボタンは「1分30秒」と表示する', () => {
+    show(30);
+    fireEvent.press(screen.getByText('種目0'));
+    expect(screen.getByText('1分30秒')).toBeTruthy();
+    expect(screen.queryByText('1.5分')).toBeNull();
+  });
+});
+
+describe('RoutineForm — セット表示でのドラッグ&ドロップ並び替え', () => {
+  // セットA（スクワット 1 / 休憩 / スクワット 2）+ 単独のプッシュアップ
+  const mixedRoutine = {
+    id: 'rm',
+    name: 'セット並び替え',
+    items: [
+      { id: 'a1', type: 'workout' as const, title: 'スクワット 1', durationSec: 60, voiceText: '', groupId: 'gA' },
+      { id: 'a2', type: 'interval' as const, title: '休憩', durationSec: 30, voiceText: '', groupId: 'gA' },
+      { id: 'a3', type: 'workout' as const, title: 'スクワット 2', durationSec: 60, voiceText: '', groupId: 'gA' },
+      { id: 'p1', type: 'workout' as const, title: 'プッシュアップ', durationSec: 30, voiceText: '' },
+    ],
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+  };
+  const mockDrag = () => (globalThis as any).__mockDrag as jest.Mock;
+  const dragEnd = (ids: string[], source = mixedRoutine.items) =>
+    act(() => {
+      (globalThis as any).__mockOnDragEnd({ data: ids.map((id) => source.find((i) => i.id === id)) });
+    });
+  const allTitles = () => screen.getAllByTestId('item-title').map((n) => n.props.children);
+
+  beforeEach(() => mockDrag().mockClear());
+
+  it('セット表示で、セットカードを長押しするとドラッグが開始される', () => {
+    render(<RoutineForm title="編集" initialValues={mixedRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('セット'));
+    fireEvent(screen.getAllByTestId('set-group-card')[0], 'longPress');
+    expect(mockDrag()).toHaveBeenCalledTimes(1);
+  });
+
+  it('セット表示でセットを並べ替えると、セット内のアイテムごと移動する', () => {
+    render(<RoutineForm title="編集" initialValues={mixedRoutine} onSubmit={jest.fn()} />);
+    fireEvent.press(screen.getByText('セット'));
+    dragEnd(['p1', 'a1']); // プッシュアップをセットAの前へ
+    fireEvent.press(screen.getByText('全表示'));
+    expect(allTitles()).toEqual(['プッシュアップ', 'スクワット 1', '休憩', 'スクワット 2']);
+  });
+
+  it('セット表示での並べ替えは未保存の変更として通知される', () => {
+    const onDirtyChange = jest.fn();
+    render(<RoutineForm title="編集" initialValues={mixedRoutine} onSubmit={jest.fn()} onDirtyChange={onDirtyChange} />);
+    fireEvent.press(screen.getByText('セット'));
+    dragEnd(['p1', 'a1']);
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it('全表示でのドラッグ並び替えは従来どおりアイテム単位で動く', () => {
+    render(<RoutineForm title="編集" initialValues={twoItemRoutine} onSubmit={jest.fn()} />);
+    dragEnd(['i2', 'i1'], twoItemRoutine.items as never);
+    expect(allTitles()).toEqual(['プッシュアップ', 'スクワット']);
   });
 });

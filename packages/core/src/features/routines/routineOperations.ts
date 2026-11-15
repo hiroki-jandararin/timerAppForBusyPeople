@@ -129,6 +129,32 @@ export function duplicateItem(routine: Routine, itemId: string): Routine {
   };
 }
 
+export function duplicateItems(routine: Routine, itemIds: string[]): Routine {
+  const selected = new Set(itemIds);
+  const sources = routine.items.filter((item) => selected.has(item.id));
+  if (sources.length === 0) return routine;
+
+  // コピー側は元と別グループにする（同じ groupId だと元との間が1セットに結合されるため）
+  const newGroupIds = new Map<string, string>();
+  const copies = sources.map((item) => {
+    const copy = cloneRoutineItem(item);
+    if (item.groupId) {
+      if (!newGroupIds.has(item.groupId)) newGroupIds.set(item.groupId, `group_${generateId()}`);
+      copy.groupId = newGroupIds.get(item.groupId);
+    }
+    return copy;
+  });
+
+  const lastIndex = routine.items.reduce((last, item, i) => (selected.has(item.id) ? i : last), -1);
+  const items = [...routine.items];
+  items.splice(lastIndex + 1, 0, ...copies);
+  return {
+    ...routine,
+    items,
+    updatedAt: nowIso(),
+  };
+}
+
 export function moveItemUp(routine: Routine, itemId: string): Routine {
   const index = routine.items.findIndex((item) => item.id === itemId);
   if (index <= 0) return routine;
@@ -439,6 +465,29 @@ export function buildGroups(
   }
 
   return groups;
+}
+
+/**
+ * セット表示の並べ替え。セット（種目間休憩を含む）と単独アイテムを1ブロックとして、
+ * orderedLeadIds（各ブロック先頭アイテムのID）の順に並べ直す。
+ * ブロックの過不足や未知のIDがある場合は元の配列をそのまま返す。
+ */
+export function reorderSetBlocks(items: RoutineItem[], orderedLeadIds: string[]): RoutineItem[] {
+  const groups = buildGroups(items, -1, false);
+  const blocks = new Map<string, RoutineItem[]>();
+  let i = 0;
+  while (i < items.length) {
+    const group = groups.find((g) => g.itemStart === i);
+    const end = group ? group.itemEnd : i;
+    blocks.set(items[i].id, items.slice(i, end + 1));
+    i = end + 1;
+  }
+
+  const isSameBlockSet =
+    orderedLeadIds.length === blocks.size && orderedLeadIds.every((id) => blocks.has(id));
+  if (!isSameBlockSet || new Set(orderedLeadIds).size !== blocks.size) return items;
+
+  return orderedLeadIds.flatMap((id) => blocks.get(id) ?? []);
 }
 
 // ─── assignGroupIds ───────────────────────────────────────────────────────────

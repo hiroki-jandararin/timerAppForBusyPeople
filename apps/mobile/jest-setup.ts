@@ -1,3 +1,8 @@
+import { configure } from '@testing-library/react-native';
+
+// CI（低スペック・全スイート並列）では初回描画が遅れ、findBy* の既定1秒でタイムアウトすることがあるため延長する
+configure({ asyncUtilTimeout: 5000 });
+
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 
 jest.mock('react-native-gesture-handler', () => {
@@ -23,14 +28,18 @@ jest.mock('react-native-gesture-handler/Swipeable', () => {
 jest.mock('react-native-draggable-flatlist', () => {
   const React = require('react');
   const { ScrollView, View } = require('react-native');
-  const DraggableFlatList = ({ data, renderItem, ListHeaderComponent, ListFooterComponent, keyExtractor, contentContainerStyle }: any) => {
+  // テストからドラッグ操作を再現できるよう、drag と onDragEnd を公開する
+  const mockDrag = jest.fn();
+  (globalThis as any).__mockDrag = mockDrag;
+  const DraggableFlatList = ({ data, renderItem, ListHeaderComponent, ListFooterComponent, keyExtractor, contentContainerStyle, onDragEnd }: any) => {
+    (globalThis as any).__mockOnDragEnd = onDragEnd;
     return React.createElement(
       ScrollView,
       { contentContainerStyle },
       ListHeaderComponent ? (React.isValidElement(ListHeaderComponent) ? ListHeaderComponent : React.createElement(ListHeaderComponent)) : null,
       ...data.map((item: any, index: number) =>
         React.createElement(View, { key: keyExtractor ? keyExtractor(item) : index },
-          renderItem({ item, index, drag: jest.fn(), isActive: false })
+          renderItem({ item, index, drag: mockDrag, isActive: false })
         )
       ),
       ListFooterComponent ? (React.isValidElement(ListFooterComponent) ? ListFooterComponent : React.createElement(ListFooterComponent)) : null,
