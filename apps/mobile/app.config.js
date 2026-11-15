@@ -65,7 +65,7 @@ export default {
     name: IS_PROD ? "QuickFit" : "QuickFit (Dev)",
     slug: "quickfit-timer",
     scheme: IS_PROD ? "quickfit" : "quickfit-dev",
-    version: "1.0.1",
+    version: "1.1.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "dark",

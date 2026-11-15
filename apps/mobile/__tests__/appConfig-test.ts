@@ -96,3 +96,22 @@ describe('eas.json の広告設定', () => {
     }
   });
 });
+
+describe('app.config.js のバージョン', () => {
+  // App Store Connect で承認済みの最新バージョン。これ以下だと「前回承認済みより高くする必要がある」で提出が拒否される。
+  // 新しいバージョンが承認されたら更新する
+  const LAST_APPROVED_VERSION = '1.0.1';
+
+  const parse = (v: string) => v.split('.').map(Number);
+  const isHigher = (a: string, b: string) => {
+    const [x, y] = [parse(a), parse(b)];
+    for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i];
+    return false;
+  };
+
+  it('マーケティングバージョンが x.y.z 形式で、承認済みの最新バージョンより高い', () => {
+    const version = (loadConfig('production').expo as unknown as { version: string }).version;
+    expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(isHigher(version, LAST_APPROVED_VERSION)).toBe(true);
+  });
+});
