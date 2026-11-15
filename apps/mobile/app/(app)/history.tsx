@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AdBanner } from '@/features/ads/AdBanner';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
 
@@ -149,6 +150,7 @@ export default function HistoryScreen() {
   const thisMonthCount = countThisMonth(byDate);
 
   return (
+    <View style={styles.screen}>
     <FlatList
       data={histories}
       keyExtractor={(item) => item.id}
@@ -205,10 +207,13 @@ export default function HistoryScreen() {
       ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
       style={{ backgroundColor: Colors.bg }}
     />
+    <AdBanner />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: Colors.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.bg },
   content: { paddingHorizontal: 16, backgroundColor: Colors.bg },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },

@@ -22,6 +22,6 @@ module.exports = {
     '^expo-modules-core/(.*)$': `${expoModulesCoreDir}/$1`,
   },
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|react-native-reanimated|react-native-gesture-handler|react-native-draggable-flatlist|react-native-worklets|@timeapp/.*)',
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|react-native-reanimated|react-native-gesture-handler|react-native-draggable-flatlist|react-native-google-mobile-ads|react-native-worklets|@timeapp/.*)',
   ],
 };

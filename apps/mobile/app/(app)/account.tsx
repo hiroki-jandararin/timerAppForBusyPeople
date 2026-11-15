@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/colors';
+import { AdBanner } from '@/features/ads/AdBanner';
 import { authApiClient } from '@timeapp/api-client';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -39,6 +40,7 @@ export default function AccountScreen() {
   };
 
   return (
+    <View style={styles.screen}>
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <Text style={styles.title}>アカウント</Text>
       <View style={styles.section}>
@@ -52,10 +54,16 @@ export default function AccountScreen() {
         <Text style={styles.hint}>アカウントを削除すると、すべてのルーティンと履歴が完全に削除されます。</Text>
       </View>
     </View>
+    <AdBanner />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: Colors.bg,
+  },
   container: {
     flex: 1,
     backgroundColor: Colors.bg,

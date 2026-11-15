@@ -1,5 +1,6 @@
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
+import { AdsProvider } from '@/features/ads/AdsProvider';
 import { Stack, useRouter } from 'expo-router';
 import { ActionSheetIOS, Pressable, StyleSheet, Text } from 'react-native';
 
@@ -79,7 +80,9 @@ const headerStyles = StyleSheet.create({
 });
 
 export default function AppLayout() {
+  // 認証済みの画面群だけを包む。サインイン前に ATT ダイアログが出ないようにするため
   return (
+    <AdsProvider>
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: Colors.bg },
@@ -107,5 +110,6 @@ export default function AppLayout() {
       <Stack.Screen name="routines/ai-prompt" options={{ headerShown: false }} />
       <Stack.Screen name="account" options={{ headerShown: true, title: 'アカウント', headerLeft: () => <BackButton /> }} />
     </Stack>
+    </AdsProvider>
   );
 }

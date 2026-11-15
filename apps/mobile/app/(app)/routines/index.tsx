@@ -2,6 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/colors';
 import { ApiError, routineApiClient } from '@timeapp/api-client';
 import { duplicateRoutine, type Routine } from '@timeapp/core';
+import { AdBanner } from '@/features/ads/AdBanner';
 import { onRoutineChanged } from '@/features/routines/routineEvents';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -184,6 +185,7 @@ export default function RoutinesScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.content}>
       <FlatList
         data={routines}
         keyExtractor={(r) => r.id}
@@ -227,13 +229,17 @@ export default function RoutinesScreen() {
       >
         <Text style={styles.fabText}>＋</Text>
       </Pressable>
+      </View>
 
+      <AdBanner />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
+  // FAB の絶対配置の基準。バナーはこの外（下）に置き、FAB と重ならないようにする
+  content: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.bg },
   list: { padding: 16, gap: 12, paddingBottom: 100 },
   card: {
