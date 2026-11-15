@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import RoutinesScreen from '../app/(app)/routines/index';
+import { AdsProvider } from '../features/ads/AdsProvider';
+import { createMockAdsService } from '../features/ads/mockAdsService';
 
 jest.mock('react-native-gesture-handler/Swipeable', () => {
   const { View, Animated } = require('react-native');
@@ -30,6 +32,10 @@ jest.mock('@/features/routines/routineEvents', () => ({
 
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(),
+  useFocusEffect: (callback: () => void | (() => void)) => require('react').useEffect(callback, []),
+}));
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }),
 }));
 jest.mock('@timeapp/api-client', () => ({
   routineApiClient: () => ({ getAll: mockGetAll, create: mockCreate, delete: mockDelete }),
@@ -125,5 +131,23 @@ describe('RoutinesScreen — CRUD 操作確認 (4.1)', () => {
     fireEvent.press(screen.getByText('削除'));
     await act(async () => { jest.advanceTimersByTime(100); });
     expect(mockDelete).toHaveBeenCalledWith('r1');
+  });
+
+  it('広告が有効なとき、一覧の下部にバナーを表示する', async () => {
+    render(
+      <AdsProvider service={createMockAdsService()}>
+        <RoutinesScreen />
+      </AdsProvider>
+    );
+
+    expect(await screen.findByText('テストルーティン')).toBeTruthy();
+    expect(await screen.findByTestId('mock-banner-view')).toBeTruthy();
+  });
+
+  it('広告のプロバイダーがなくてもバナーは出ず、一覧は通常どおり表示される', async () => {
+    render(<RoutinesScreen />);
+
+    expect(await screen.findByText('テストルーティン')).toBeTruthy();
+    expect(screen.queryByTestId('mock-banner-view')).toBeNull();
   });
 });

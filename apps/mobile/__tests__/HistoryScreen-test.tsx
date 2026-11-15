@@ -1,9 +1,12 @@
 import { render, screen } from '@testing-library/react-native';
 import { useRouter } from 'expo-router';
 import HistoryScreen from '../app/(app)/history';
+import { AdsProvider } from '../features/ads/AdsProvider';
+import { createMockAdsService } from '../features/ads/mockAdsService';
 
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(),
+  useFocusEffect: (callback: () => void | (() => void)) => require('react').useEffect(callback, []),
 }));
 jest.mock('@timeapp/api-client', () => ({
   workoutHistoryApiClient: () => ({ getAll: mockGetAll }),
@@ -169,5 +172,25 @@ describe('HistoryScreen — API 取得・カレンダー表示 (4.3)', () => {
     render(<HistoryScreen />);
     await screen.findByText('ワークアウト履歴');
     expect(screen.getByText(/年.*月/)).toBeTruthy();
+  });
+});
+
+describe('HistoryScreen の広告', () => {
+  it('広告が有効なとき、画面の下部にバナーを表示する', async () => {
+    render(
+      <AdsProvider service={createMockAdsService()}>
+        <HistoryScreen />
+      </AdsProvider>
+    );
+
+    expect(await screen.findByText('ワークアウト履歴')).toBeTruthy();
+    expect(await screen.findByTestId('mock-banner-view')).toBeTruthy();
+  });
+
+  it('広告のプロバイダーがなくてもバナーは出ず、履歴は通常どおり表示される', async () => {
+    render(<HistoryScreen />);
+
+    expect(await screen.findByText('ワークアウト履歴')).toBeTruthy();
+    expect(screen.queryByTestId('mock-banner-view')).toBeNull();
   });
 });

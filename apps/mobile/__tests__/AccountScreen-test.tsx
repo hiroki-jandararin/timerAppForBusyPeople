@@ -1,6 +1,8 @@
 import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AccountScreen from '../app/(app)/account';
+import { AdsProvider } from '../features/ads/AdsProvider';
+import { createMockAdsService } from '../features/ads/mockAdsService';
 
 const mockSignOut = jest.fn();
 const mockDeleteAccount = jest.fn();
@@ -69,4 +71,22 @@ it('API失敗時にエラーアラートが表示される', async () => {
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalledWith('エラー', expect.any(String));
   });
+});
+
+it('広告が有効なとき、画面の下部にバナーを表示する', async () => {
+  render(
+    <AdsProvider service={createMockAdsService()}>
+      <AccountScreen />
+    </AdsProvider>
+  );
+
+  expect(screen.getByText('アカウントを削除')).toBeTruthy();
+  expect(await screen.findByTestId('mock-banner-view')).toBeTruthy();
+});
+
+it('広告のプロバイダーがなくてもバナーは出ず、画面は通常どおり表示される', () => {
+  render(<AccountScreen />);
+
+  expect(screen.getByText('アカウントを削除')).toBeTruthy();
+  expect(screen.queryByTestId('mock-banner-view')).toBeNull();
 });
